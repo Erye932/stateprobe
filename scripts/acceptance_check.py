@@ -70,6 +70,7 @@ def check_required_files(result: Result) -> None:
         ".github/ISSUE_TEMPLATE/feature_request.md",
         ".github/ISSUE_TEMPLATE/rule_request.md",
         "docs/PROJECT_BRIEF.md",
+        "docs/PROJECT_PLAN.md",
         "docs/DEMO_WALKTHROUGH.md",
         "docs/ARCHITECTURE.md",
         "docs/EVIDENCE_MODEL.md",
@@ -102,6 +103,7 @@ def check_readme(result: Result) -> None:
         "Static Mode",
         "Black-box Eval",
         "DeepSeek Lab",
+        "docs/PROJECT_PLAN.md",
         "docs/ARCHITECTURE.md",
         "docs/EVIDENCE_MODEL.md",
         "docs/DEEPSEEK_ROADMAP.md",
@@ -126,6 +128,7 @@ def check_docs(result: Result) -> None:
     evidence = read("docs/EVIDENCE_MODEL.md")
     faq = read("docs/FAQ.md")
     open_source = read("docs/OPEN_SOURCE_PLAN.md")
+    project_plan = read("docs/PROJECT_PLAN.md")
     quality = read("docs/QUALITY_BAR.md")
     deepseek_roadmap = read("docs/DEEPSEEK_ROADMAP.md")
     visibility = read("docs/CONTRIBUTOR_VISIBILITY_PLAN.md")
@@ -135,6 +138,9 @@ def check_docs(result: Result) -> None:
     result.check("just a bunch of regex" in faq, "FAQ answers regex objection")
     result.check("Does StateProbe read real activations?" in faq, "FAQ answers activation objection")
     result.check("Is StateProbe only for DeepSeek-R1?" in faq, "FAQ answers DeepSeek-only objection")
+    result.check("North star" in project_plan, "project plan defines north star")
+    result.check("Version roadmap" in project_plan, "project plan defines version roadmap")
+    result.check("First 30 days" in project_plan, "project plan defines first 30 days")
     result.check("GitHub launch checklist" in open_source, "open-source plan includes launch checklist")
     result.check("10k-star reference bar" in quality, "quality bar includes high-star benchmark")
     result.check("DeepSeek-first, not DeepSeek-only" in deepseek_roadmap, "DeepSeek roadmap states project focus")
