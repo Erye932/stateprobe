@@ -26,6 +26,10 @@ StateProbe 填这个空白：它诊断 prompt 会把模型推向什么行为状�
 
 ### 30 秒 Demo
 
+<p align="center">
+  <img src="docs/images/demo_terminal.svg" alt="StateProbe 终端诊断效果" width="700">
+</p>
+
 ```bash
 $ stateprobe check --file demos/smart_but_not_answering/bad_prompt.txt
 ```
