@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stateprobe"
+version = "0.1.0"
+description = "A debugger for prompts and LLM behavior."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+authors = [
+    { name = "StateProbe Contributors" }
+]
+keywords = ["llm", "prompt-engineering", "prompt-debugging", "llm-evaluation", "persona-vectors", "activation-steering"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "click>=8.1.0",
+    "rich>=13.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+]
+lab = [
+    "torch>=2.2.0",
+    "transformers>=4.40.0",
+    "accelerate>=0.28.0",
+    "safetensors>=0.4.0",
+    "numpy>=1.26.0",
+]
+
+[project.scripts]
+stateprobe = "stateprobe.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yourname/stateprobe"
+Issues = "https://github.com/yourname/stateprobe/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["stateprobe*"]
+
+[tool.setuptools.package-data]
+stateprobe = ["templates/*.html"]
