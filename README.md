@@ -5,6 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
 [![Status](https://img.shields.io/badge/status-alpha-orange.svg)](#路线图)
+[![CI](https://github.com/Erye932/stateprobe/actions/workflows/ci.yml/badge.svg)](https://github.com/Erye932/stateprobe/actions/workflows/ci.yml)
 
 ---
 
@@ -60,7 +61,9 @@ StateProbe 会指出它的风险：
 - [`docs/OPEN_SOURCE_PLAN.md`](docs/OPEN_SOURCE_PLAN.md)：完整开源项目计划
 - [`docs/PUBLISHING.md`](docs/PUBLISHING.md)：安全发布流程
 - [`CONTRIBUTING.md`](CONTRIBUTING.md)：贡献规则和 PR 验收标准
+- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)：社区行为准则
 - [`CHANGELOG.md`](CHANGELOG.md)：版本变更记录
+- [`CITATION.cff`](CITATION.cff)：研究和技术写作引用信息
 
 可直接运行的 demo prompt 在 [`demos/`](demos/) 目录。
 

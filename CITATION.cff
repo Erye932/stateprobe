@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+title: StateProbe
+message: "If you use StateProbe in research, evaluation, or technical writing, please cite the repository."
+type: software
+authors:
+  - name: StateProbe Contributors
+repository-code: "https://github.com/Erye932/stateprobe"
+url: "https://github.com/Erye932/stateprobe"
+abstract: "StateProbe is a debugger for prompts and LLM behavior. It diagnoses prompt-induced behavior pressure across interpretable axes and separates static proxy evidence, black-box behavioral evidence, and local activation probing."
+keywords:
+  - llm
+  - prompt-debugging
+  - llm-evaluation
+  - activation-probing
+  - persona-vectors
+license: MIT
+version: 0.1.0

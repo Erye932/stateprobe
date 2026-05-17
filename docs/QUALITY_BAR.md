@@ -52,9 +52,9 @@ Required before serious public promotion:
 
 - One screenshot or HTML report preview exists.
 - A benchmark or accuracy roadmap is visible.
+- Repository governance files exist: contributing guide, changelog, security policy, code of conduct, citation file, CI, issue templates, and PR template.
 - Failure cases are documented.
-- Contribution path is clear.
-- The project has a memorable tagline.
+- **Contribution path**: contributors can find CI, issue templates, PR checklist, changelog, code of conduct, citation file, and contribution rules.
 - The demo can be understood without reading source code.
 
 ## Default acceptance command

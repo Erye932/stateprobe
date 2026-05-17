@@ -56,8 +56,11 @@ def run_command(args: list[str]) -> tuple[int, str]:
 
 def check_required_files(result: Result) -> None:
     required = [
+        ".gitattributes",
         "README.md",
         "CHANGELOG.md",
+        "CODE_OF_CONDUCT.md",
+        "CITATION.cff",
         "CONTRIBUTING.md",
         "SECURITY.md",
         "pyproject.toml",
@@ -103,6 +106,8 @@ def check_readme(result: Result) -> None:
         "docs/QUALITY_BAR.md",
         "docs/OPEN_SOURCE_PLAN.md",
         "docs/PUBLISHING.md",
+        "CODE_OF_CONDUCT.md",
+        "CITATION.cff",
         "CONTRIBUTING.md",
         "CHANGELOG.md",
     ]
@@ -129,11 +134,15 @@ def check_docs(result: Result) -> None:
     changelog = read("CHANGELOG.md")
     security = read("SECURITY.md")
     publishing = read("docs/PUBLISHING.md")
+    code_of_conduct = read("CODE_OF_CONDUCT.md")
+    citation = read("CITATION.cff")
     result.check("python scripts/acceptance_check.py" in contributing, "contributing guide requires acceptance check")
     result.check("Evidence discipline" in contributing, "contributing guide preserves evidence boundary")
     result.check("0.1.0 - Unreleased" in changelog, "changelog has unreleased version section")
     result.check("default `stateprobe check` command does not call external APIs" in security, "security policy states local-first default")
     result.check("revoke it immediately" in publishing, "publishing guide covers leaked token response")
+    result.check("Expected behavior" in code_of_conduct, "code of conduct defines expected behavior")
+    result.check("repository-code: \"https://github.com/Erye932/stateprobe\"" in citation, "citation file points to GitHub repository")
 
 
 def check_demos(result: Result) -> None:
