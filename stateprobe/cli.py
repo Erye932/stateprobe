@@ -318,7 +318,183 @@ def main(ctx: click.Context) -> None:
     """
     _ensure_utf8_windows()
     if ctx.invoked_subcommand is None:
-        click.echo(ctx.get_help())
+        _show_welcome()
+
+
+def _show_welcome() -> None:
+    """Welcome screen shown when stateprobe is invoked with no arguments.
+
+    Replaces the default click help dump with a friendlier 3-option menu
+    optimized for first-time users.
+    """
+    welcome = Panel(
+        Text.from_markup(
+            "[bold cyan]StateProbe[/bold cyan]  ·  Prompt 状态调试器\n\n"
+            "第一次用？直接试这两个：\n\n"
+            "  [bold green]stateprobe demo[/bold green]              "
+            "[dim]# 30 秒看完整诊断效果[/dim]\n"
+            "  [bold green]stateprobe ask[/bold green]               "
+            "[dim]# 进入对话模式，粘贴 prompt 直接诊断[/dim]\n\n"
+            "或者直接传 prompt：\n\n"
+            "  [bold green]stateprobe check[/bold green] [yellow]\"你是资深专家请分析所有角度\"[/yellow]\n\n"
+            "[dim]看全部命令：stateprobe --help[/dim]"
+        ),
+        border_style="cyan",
+        padding=(1, 2),
+    )
+    console.print(welcome)
+
+
+@main.command()
+def demo() -> None:
+    """30 秒演示：用一个典型坏 prompt 跑完整诊断。
+
+    不需要任何参数。读者装完直接 `stateprobe demo` 就能看到工具能力。
+    """
+    _ensure_utf8_windows()
+    demo_prompt = "你是一位顶级 AI 专家，请彻底全面深入仔细完整地分析所有角度"
+    console.print(Panel(
+        Text.from_markup(
+            f"[bold]演示 prompt:[/bold] [yellow]{demo_prompt}[/yellow]\n\n"
+            f"[dim]这是一个典型的'看起来很好其实很糟'的 prompt：\n"
+            f"  · 强人设触发专家腔\n"
+            f"  · 同义词堆叠（彻底/全面/深入/仔细/完整）\n"
+            f"  · 任务过宽（所有角度）\n"
+            f"  · 无失败标准\n"
+            f"接下来 StateProbe 会诊断 V4-Pro 上的实际行为压力 ↓[/dim]"
+        ),
+        title="\n[bold cyan]StateProbe Demo[/bold cyan]",
+        border_style="cyan",
+    ))
+    console.print()
+    report = diagnose(demo_prompt, target_name="calm_reasoning", model_name="v4-pro")
+    render_terminal(report)
+    console.print(Panel(
+        Text.from_markup(
+            "[bold green]✓ Demo 结束。[/bold green]\n\n"
+            "想试你自己的 prompt？\n"
+            "  [bold cyan]stateprobe ask[/bold cyan]                          "
+            "[dim]# 对话模式，粘贴即诊断[/dim]\n"
+            "  [bold cyan]stateprobe check[/bold cyan] [yellow]\"你的 prompt\"[/yellow]   "
+            "[dim]# 单次诊断[/dim]\n\n"
+            "[dim]切换模型基线：--model v4-pro / v4-flash / deepseek / generic\n"
+            "切换目标状态：--target calm_reasoning / strict_execution / ...[/dim]"
+        ),
+        border_style="green",
+    ))
+
+
+@main.command()
+@click.option(
+    "-t", "--target", "target_name",
+    type=click.Choice(list(TARGET_PRESETS), case_sensitive=False),
+    default=DEFAULT_TARGET,
+    show_default=True,
+    help="初始目标状态预设。可在对话中用 :target <name> 切换。",
+)
+@click.option(
+    "-m", "--model", "model_name",
+    type=click.Choice(list(MODEL_BASELINES), case_sensitive=False),
+    default=DEFAULT_MODEL_BASELINE,
+    show_default=True,
+    help="初始模型基线。可在对话中用 :model <name> 切换。",
+)
+def ask(target_name: str, model_name: str) -> None:
+    """对话模式：粘贴 prompt 即诊断。最适合新手。
+
+    支持的对话指令：
+      :model v4-pro     切换模型基线
+      :target strict_execution   切换目标
+      :targets          列出所有目标
+      :models           列出所有模型
+      :clear            清屏
+      :q  /  :quit      退出
+    """
+    _ensure_utf8_windows()
+    console.print(Panel(
+        Text.from_markup(
+            "[bold cyan]StateProbe 对话模式[/bold cyan]\n\n"
+            "粘贴你的 prompt（[yellow]空行结束输入并诊断[/yellow]）。\n"
+            f"当前设定：[green]model={model_name}[/green]  [green]target={target_name}[/green]\n\n"
+            "[dim]命令：:model <name>  ·  :target <name>  ·  :models  ·  :targets  ·  :q 退出[/dim]"
+        ),
+        border_style="cyan",
+    ))
+    console.print()
+
+    current_model = model_name
+    current_target = target_name
+
+    while True:
+        try:
+            # Collect multi-line input until blank line
+            console.print("[bold cyan]>[/bold cyan] ", end="")
+            first_line = input().strip()
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n[dim]再见。[/dim]")
+            return
+
+        if not first_line:
+            continue
+
+        # Handle dialog commands
+        if first_line.startswith(":"):
+            cmd_parts = first_line[1:].split(None, 1)
+            cmd = cmd_parts[0].lower() if cmd_parts else ""
+            arg = cmd_parts[1].strip() if len(cmd_parts) > 1 else ""
+            if cmd in ("q", "quit", "exit"):
+                console.print("[dim]再见。[/dim]")
+                return
+            if cmd == "clear":
+                console.clear()
+                continue
+            if cmd == "models":
+                console.print("[bold]可用模型基线：[/bold]")
+                for name in MODEL_BASELINES:
+                    marker = " [green](当前)[/green]" if name == current_model else ""
+                    console.print(f"  · {name}{marker}")
+                continue
+            if cmd == "targets":
+                console.print("[bold]可用目标预设：[/bold]")
+                for name in TARGET_PRESETS:
+                    marker = " [green](当前)[/green]" if name == current_target else ""
+                    console.print(f"  · {name}{marker}")
+                continue
+            if cmd == "model":
+                if arg in MODEL_BASELINES:
+                    current_model = arg
+                    console.print(f"[green]✓ 模型切换为 {arg}[/green]")
+                else:
+                    console.print(f"[red]未知模型 {arg!r}。可用：{list(MODEL_BASELINES)}[/red]")
+                continue
+            if cmd == "target":
+                if arg in TARGET_PRESETS:
+                    current_target = arg
+                    console.print(f"[green]✓ 目标切换为 {arg}[/green]")
+                else:
+                    console.print(f"[red]未知目标 {arg!r}。可用：{list(TARGET_PRESETS)}[/red]")
+                continue
+            console.print(f"[red]未知命令 :{cmd}[/red]")
+            continue
+
+        # Collect additional lines until blank
+        lines = [first_line]
+        while True:
+            try:
+                next_line = input()
+            except (EOFError, KeyboardInterrupt):
+                break
+            if not next_line.strip():
+                break
+            lines.append(next_line)
+
+        prompt = "\n".join(lines)
+        console.print()
+        report = diagnose(prompt, target_name=current_target, model_name=current_model)
+        render_terminal(report)
+        console.print()
+        console.print("[dim]继续粘贴下一个 prompt，或 :q 退出[/dim]")
+        console.print()
 
 
 @main.command()

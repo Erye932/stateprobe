@@ -150,12 +150,31 @@ DeepSeek 方向详见 [`docs/DEEPSEEK_ROADMAP.md`](docs/DEEPSEEK_ROADMAP.md)：�
 ## 安装
 
 ```bash
-git clone https://github.com/Erye932/stateprobe.git
+git clone ssh://git@ssh.github.com:443/Erye932/stateprobe.git
 cd stateprobe
 pip install -e .
 ```
 
-依赖很轻：`click`, `rich`。**无 LLM API 调用**——纯规则引擎，零成本、毫秒响应、可离线。
+> ℹ️ 用 SSH-over-443 而非 HTTPS：中国大陆 HTTPS 直连 GitHub 经常超时，SSH-over-443 走的是另一条链路、稳定可达。需先在 [GitHub Settings](https://github.com/settings/keys) 加入你的 SSH 公钥（一次性，5 分钟）。
+
+装好之后，**输 `stateprobe` 看欢迎屏，立刻知道要做什么**：
+
+```bash
+$ stateprobe
+┌──────────────────────────────────────────────────┐
+│  StateProbe  ·  Prompt 状态调试器                │
+│                                                  │
+│  第一次用？直接试这两个：                          │
+│                                                  │
+│    stateprobe demo     # 30 秒看完整诊断效果      │
+│    stateprobe ask      # 对话模式，粘贴 prompt   │
+│                                                  │
+│  或者直接传 prompt：                              │
+│    stateprobe check "..."                        │
+└──────────────────────────────────────────────────┘
+```
+
+依赖很轻：`click`, `rich`。**无 LLM API 调用**——纯规则引擎、零成本、毫秒响应、可离线。
 
 如果要启用 DeepSeek hidden-state 实验模式：
 
