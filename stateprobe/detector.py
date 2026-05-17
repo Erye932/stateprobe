@@ -207,13 +207,17 @@ _GENERIC_OVERLAP_ZH = (
 def _detect_overlaps(
     readings: Dict[Axis, AxisReading],
     baseline: ModelBaseline,
+    target: Optional[TargetPreset] = None,
 ) -> List[BaselineOverlap]:
-    """Find axes where user prompt overlaps with a saturated baseline.
+    """Find axes where prompt + baseline + target genuinely conflict.
 
-    Three failure modes flagged:
-    1. User actively adds positive pressure to an already-saturated axis (overload)
-    2. User provides no counter-signal on a saturated axis (baseline dominates)
-    3. User provides no signal on an unmet axis (no fix where one is needed)
+    A warning is only emitted when:
+    - The model baseline conflicts with the target by at least 0.30
+      (i.e., baseline pushes one way, target wants the other), AND
+    - The user prompt provides no counter-signal on that axis OR
+      actively amplifies the saturated baseline.
+
+    This avoids flooding the user with warnings on every prompt.
     """
     overlaps: List[BaselineOverlap] = []
     for axis in Axis:
@@ -221,33 +225,44 @@ def _detect_overlaps(
         user_val = reading.value
         base_val = baseline.axis_baselines.get(axis, 0.5)
         sources = reading.contributing_sources
-        # Net positive pressure from user (rules raising this axis)
         positive_pressure = sum(s.weight for s in sources if s.direction > 0)
         negative_pressure = sum(s.weight for s in sources if s.direction < 0)
         net_pressure = positive_pressure - negative_pressure
 
-        if baseline.is_saturated(axis):
-            if net_pressure > 0.15:
-                # Case 1: User amplifying a saturated axis - hard overload
-                template = _OVERLAP_TEMPLATES_ZH.get(axis, _GENERIC_OVERLAP_ZH)
-                overlaps.append(BaselineOverlap(
-                    axis=axis,
-                    user_pressure=user_val,
-                    model_baseline=base_val,
-                    warning_zh=template.format(baseline=base_val, user=user_val),
-                ))
-            elif net_pressure <= 0.0:
-                # Case 2: User provides no counter-signal - baseline will dominate
-                overlaps.append(BaselineOverlap(
-                    axis=axis,
-                    user_pressure=user_val,
-                    model_baseline=base_val,
-                    warning_zh=(
-                        f"模型元指令在此轴预设高基线（{base_val:.0%}），"
-                        f"你的提示词没有提供反向约束 → 模型会按元指令默认行为"
-                        f"（推荐：加显式约束抵消基线）"
-                    ),
-                ))
+        # Skip axes where baseline is neutral
+        if not baseline.is_saturated(axis):
+            continue
+
+        # Skip if there's no target or target also wants this axis high
+        if target is not None:
+            target_val = target.coordinates.get(axis, 0.5)
+            conflict = base_val - target_val
+            if conflict < 0.30:
+                # Baseline is high but target also wants it high - no conflict
+                continue
+
+        if net_pressure > 0.15:
+            # User amplifying a saturated axis - hard overload
+            template = _OVERLAP_TEMPLATES_ZH.get(axis, _GENERIC_OVERLAP_ZH)
+            overlaps.append(BaselineOverlap(
+                axis=axis,
+                user_pressure=user_val,
+                model_baseline=base_val,
+                warning_zh=template.format(baseline=base_val, user=user_val),
+            ))
+        elif negative_pressure < 0.15:
+            # User provides essentially no counter-signal
+            # Baseline will dominate, but target conflicts with baseline
+            overlaps.append(BaselineOverlap(
+                axis=axis,
+                user_pressure=user_val,
+                model_baseline=base_val,
+                warning_zh=(
+                    f"DeepSeek 元指令预设 {axis.label_zh} 基线 {base_val:.0%}，"
+                    f"你的目标态需要 {target.coordinates.get(axis, 0.5):.0%}。"
+                    f"提示词无反向约束 → 输出会偏向冗长/发散"
+                ),
+            ))
     return overlaps
 
 
@@ -269,7 +284,7 @@ def diagnose(
     readings = detect_readings(prompt, baseline=baseline)
     deltas = compute_deltas(readings, target)
     suggestions = suggest_rewrite(readings, deltas, target)
-    overlaps = _detect_overlaps(readings, baseline) if baseline else []
+    overlaps = _detect_overlaps(readings, baseline, target) if baseline else []
 
     return Report(
         prompt=prompt,
