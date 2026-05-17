@@ -47,8 +47,8 @@ lab = [
 stateprobe = "stateprobe.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yourname/stateprobe"
-Issues = "https://github.com/yourname/stateprobe/issues"
+Homepage = "https://github.com/Erye932/stateprobe"
+Issues = "https://github.com/Erye932/stateprobe/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
