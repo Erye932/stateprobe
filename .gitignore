@@ -51,3 +51,6 @@ demo_report.html
 
 # Drafts (unpublished articles, not for public repo)
 drafts/
+
+# IDE private workflows
+.windsurf/

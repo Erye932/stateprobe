@@ -71,29 +71,66 @@ def _find_matches(prompt: str, rule: Rule) -> List[str]:
 _SATURATION_K = 0.8
 
 
-def _aggregate(sources: List[PollutionSource]) -> float:
+def _aggregate(sources: List[PollutionSource], baseline: float = 0.5) -> float:
     """Combine pollution sources on one axis into a single 0-1 reading.
 
-    Uses tanh-saturated weighted sum centered at 0.5 (neutral)."""
+    The reading starts at the model's meta-instruction baseline (not at 0.5).
+    Detected rule pressure shifts it up/down from that baseline.
+
+    This reflects the Anthropic activation-vector picture: even an empty
+    prompt has non-neutral activations driven by the model's meta-instruction.
+
+    With no rules matched: returns baseline (model's preset activation).
+    With positive pressure: shifts upward, bounded by tanh saturation toward 1.
+    With negative pressure: shifts downward, bounded by tanh saturation toward 0.
+    """
     if not sources:
-        return 0.5
+        return baseline
     net_pressure = sum(s.direction * s.weight for s in sources)
-    return 0.5 + 0.5 * math.tanh(_SATURATION_K * net_pressure)
+    # Map pressure to [-baseline, 1-baseline] range using tanh saturation,
+    # so that the result stays in [0, 1] while preserving baseline as the
+    # zero-pressure resting point.
+    saturated = math.tanh(_SATURATION_K * net_pressure)
+    if saturated >= 0:
+        # Push from baseline toward 1.0
+        return baseline + saturated * (1.0 - baseline)
+    else:
+        # Push from baseline toward 0.0
+        return baseline + saturated * baseline
 
 
 # ---------------------------------------------------------------------------
 # Main detection API
 # ---------------------------------------------------------------------------
 
-def detect_readings(prompt: str) -> Dict[Axis, AxisReading]:
+def detect_readings(
+    prompt: str,
+    baseline: Optional[ModelBaseline] = None,
+) -> Dict[Axis, AxisReading]:
     """Run all rules against the prompt and return per-axis readings.
 
-    Each AxisReading.value is in [0, 1] where 0.5 is neutral.
+    Each AxisReading.value is in [0, 1] where the starting point is the
+    model's meta-instruction baseline (not 0.5 neutral).
+
+    Args:
+        prompt: The user's prompt text.
+        baseline: Optional model baseline. If None, uses neutral 0.5 baseline.
+
     Each AxisReading.contributing_sources lists every rule that matched.
+    Empty prompt returns the model's baseline readings (reflecting the fact
+    that even with no user input, meta-instructions still activate vectors).
     """
+    def _baseline_for(axis: Axis) -> float:
+        if baseline is None:
+            return 0.5
+        return baseline.axis_baselines.get(axis, 0.5)
+
     if not prompt or not prompt.strip():
-        # Empty prompt → all axes neutral with no sources.
-        return {axis: AxisReading(axis=axis, value=0.5) for axis in Axis}
+        # Empty prompt → readings equal the model's meta-instruction baseline.
+        return {
+            axis: AxisReading(axis=axis, value=_baseline_for(axis))
+            for axis in Axis
+        }
 
     # Bucket pollution sources by axis.
     sources_by_axis: Dict[Axis, List[PollutionSource]] = {axis: [] for axis in Axis}
@@ -102,9 +139,6 @@ def detect_readings(prompt: str) -> Dict[Axis, AxisReading]:
         matches = _find_matches(prompt, rule)
         if not matches:
             continue
-        # If a rule matches multiple times in one prompt, we still only count
-        # it once (per-rule effect). But we record the first matched span as
-        # representative for the explanation.
         representative = matches[0]
         source = PollutionSource(
             rule_id=rule.id,
@@ -117,15 +151,14 @@ def detect_readings(prompt: str) -> Dict[Axis, AxisReading]:
         )
         sources_by_axis[rule.axis].append(source)
 
-    # Build readings.
+    # Build readings, anchored to the model baseline.
     readings: Dict[Axis, AxisReading] = {}
     for axis in Axis:
         sources = sources_by_axis[axis]
-        # Sort sources by absolute contribution descending for explanation order.
         sources.sort(key=lambda s: s.weight, reverse=True)
         readings[axis] = AxisReading(
             axis=axis,
-            value=_aggregate(sources),
+            value=_aggregate(sources, baseline=_baseline_for(axis)),
             contributing_sources=sources,
         )
     return readings
@@ -175,20 +208,46 @@ def _detect_overlaps(
     readings: Dict[Axis, AxisReading],
     baseline: ModelBaseline,
 ) -> List[BaselineOverlap]:
-    """Find axes where user prompt pressure overlaps with a saturated baseline."""
+    """Find axes where user prompt overlaps with a saturated baseline.
+
+    Three failure modes flagged:
+    1. User actively adds positive pressure to an already-saturated axis (overload)
+    2. User provides no counter-signal on a saturated axis (baseline dominates)
+    3. User provides no signal on an unmet axis (no fix where one is needed)
+    """
     overlaps: List[BaselineOverlap] = []
     for axis in Axis:
-        user_val = readings[axis].value
+        reading = readings[axis]
+        user_val = reading.value
         base_val = baseline.axis_baselines.get(axis, 0.5)
-        # Only flag if: baseline is already high AND user is also pushing high
-        if baseline.is_saturated(axis) and user_val > 0.60:
-            template = _OVERLAP_TEMPLATES_ZH.get(axis, _GENERIC_OVERLAP_ZH)
-            overlaps.append(BaselineOverlap(
-                axis=axis,
-                user_pressure=user_val,
-                model_baseline=base_val,
-                warning_zh=template.format(baseline=base_val, user=user_val),
-            ))
+        sources = reading.contributing_sources
+        # Net positive pressure from user (rules raising this axis)
+        positive_pressure = sum(s.weight for s in sources if s.direction > 0)
+        negative_pressure = sum(s.weight for s in sources if s.direction < 0)
+        net_pressure = positive_pressure - negative_pressure
+
+        if baseline.is_saturated(axis):
+            if net_pressure > 0.15:
+                # Case 1: User amplifying a saturated axis - hard overload
+                template = _OVERLAP_TEMPLATES_ZH.get(axis, _GENERIC_OVERLAP_ZH)
+                overlaps.append(BaselineOverlap(
+                    axis=axis,
+                    user_pressure=user_val,
+                    model_baseline=base_val,
+                    warning_zh=template.format(baseline=base_val, user=user_val),
+                ))
+            elif net_pressure <= 0.0:
+                # Case 2: User provides no counter-signal - baseline will dominate
+                overlaps.append(BaselineOverlap(
+                    axis=axis,
+                    user_pressure=user_val,
+                    model_baseline=base_val,
+                    warning_zh=(
+                        f"模型元指令在此轴预设高基线（{base_val:.0%}），"
+                        f"你的提示词没有提供反向约束 → 模型会按元指令默认行为"
+                        f"（推荐：加显式约束抵消基线）"
+                    ),
+                ))
     return overlaps
 
 
@@ -206,11 +265,10 @@ def diagnose(
             Use None to skip baseline overlap detection.
     """
     target = get_target(target_name)
-    readings = detect_readings(prompt)
+    baseline = get_model_baseline(model_name) if model_name else None
+    readings = detect_readings(prompt, baseline=baseline)
     deltas = compute_deltas(readings, target)
     suggestions = suggest_rewrite(readings, deltas, target)
-
-    baseline = get_model_baseline(model_name) if model_name else None
     overlaps = _detect_overlaps(readings, baseline) if baseline else []
 
     return Report(
