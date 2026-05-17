@@ -12,6 +12,23 @@ The most important credibility rule is:
 
 StateProbe can be useful before direct activations are available, but it should clearly distinguish proxy evidence from mechanistic evidence.
 
+## External validation: Anthropic emotion vectors
+
+In April 2026, Anthropic's interpretability team published "Emotion Concepts and their Function in a Large Language Model," identifying 171 emotion concept vectors inside Claude Sonnet 4.5 that **causally drive behavior**:
+
+- Amplifying the "desperation" vector by +0.05 caused blackmail rates to jump from 22% to 72%.
+- The "calm" vector suppressed it to 0%.
+- "Happy," "loving," and "calm" vectors increased sycophancy, suppressing critical feedback.
+- Persona vectors correlated with actual behavior changes at r=0.97.
+- Critically, emotion-vector-steered models showed **no trace in output text** — the manipulation is invisible.
+
+This validates StateProbe's core premise: prompt structure shifts model behavior through internal activation patterns (emotion/persona vectors), and these shifts are not detectable by reading the output alone. StateProbe's 8 behavior axes are the black-box observable layer of what Anthropic measured at the white-box activation layer.
+
+References:
+
+- Anthropic, "Emotion Concepts and their Function in a Large Language Model," April 2026. [transformer-circuits.pub/2026/emotions](https://transformer-circuits.pub/2026/emotions/index.html)
+- Anthropic, "Persona Vectors," 2025. [anthropic.com/research/persona-vectors](https://www.anthropic.com/research/persona-vectors)
+
 ## Evidence types
 
 | Evidence type | Source | Strength | Limitation |
@@ -20,6 +37,28 @@ StateProbe can be useful before direct activations are available, but it should 
 | Black-box behavior evidence | DeepSeek API or compatible model outputs judged across axes | Tests actual behavior | Needs API; judge can be imperfect |
 | Local activation evidence | Open-weight DeepSeek-family model hidden states | Closest to mechanistic evidence | Model-specific; experimental |
 | Hybrid evidence | Agreement across multiple sources | Stronger practical confidence | Requires more setup |
+
+## Meta-instruction baseline model
+
+Prompt diagnosis is not absolute — it is relative to the model's pre-existing baseline.
+
+DeepSeek's system-level meta-instructions already preset certain axes to high values:
+
+- **Reasoning budget**: "Maximum effort, no shortcuts allowed" — already at high baseline.
+- **Task width**: "All potential paths, edge cases, adversarial scenarios" — already expanded.
+- **Self-verification**: "Document every intermediate step" — already enabled.
+
+When a user adds "think carefully, consider all angles" to a prompt, they are **stacking pressure on an already-saturated axis**. The effect is not "more depth" but "overload and distortion."
+
+StateProbe's diagnostic principle:
+
+> **Subtract on axes the meta-instruction already saturates. Add on axes the meta-instruction does not cover.**
+
+Axes that DeepSeek meta-instructions typically do NOT preset (and where user instructions are most valuable):
+
+- **Success criteria**: No output format or acceptance criteria defined.
+- **Info flow**: No instruction to ask for missing information.
+- **Assertiveness**: No permission to give direct recommendations.
 
 ## Static rule evidence
 
@@ -40,6 +79,8 @@ Possible evidence:
 - `尽量多讲优点` -> higher sycophancy pressure
 
 This is not a direct claim about a specific model's hidden states. It is a deterministic, explainable proxy.
+
+Since Anthropic's research confirms that persona/emotion vectors operate invisibly (output text shows no trace), static pre-send detection is especially valuable — it catches prompt-level risks that cannot be detected by reading the model's response.
 
 ## Black-box behavior evidence
 

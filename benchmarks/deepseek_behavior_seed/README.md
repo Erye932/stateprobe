@@ -66,4 +66,9 @@ See [docs/EVIDENCE_MODEL.md](../../docs/EVIDENCE_MODEL.md) for the full evidence
 
 ## Current status
 
-Seed phase: building toward 20 cases covering all 8 axes.
+20 cases covering all 8 axes, each with real DeepSeek-Chat API outputs (before/after).
+
+Next targets:
+- Expand to 50+ cases.
+- Add meta-instruction overlap annotations per case.
+- Add emotion-vector-relevant tags linking to Anthropic's research on persona/emotion vectors.

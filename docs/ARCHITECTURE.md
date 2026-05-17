@@ -99,6 +99,23 @@ positive/negative contrastive pairs
   -> cosine projection
 ```
 
+## Meta-instruction baseline awareness
+
+StateProbe diagnoses prompt pressure **relative to the target model's meta-instruction baseline**, not in absolute terms.
+
+DeepSeek's meta-instructions already preset certain axes (reasoning budget, task width, self-verification) to high values. A prompt instruction that duplicates an already-saturated axis causes overload, not improvement.
+
+The diagnostic principle:
+
+> Subtract on axes the meta-instruction already saturates. Add on axes the meta-instruction does not cover.
+
+This means StateProbe's static warnings should indicate:
+
+- Whether the detected pattern **overlaps** with a known meta-instruction preset (redundant pressure)
+- Whether the prompt is **missing** instructions on axes that the meta-instruction does not cover (success criteria, info flow, assertiveness)
+
+See [EVIDENCE_MODEL.md](EVIDENCE_MODEL.md) for the full baseline model and Anthropic's emotion vector validation.
+
 ## Design invariants
 
 - `stateprobe check` must remain offline and cheap.
@@ -106,6 +123,7 @@ positive/negative contrastive pairs
 - Black-box Eval must be optional because it needs API keys.
 - DeepSeek Lab must be optional because it needs heavy dependencies and model weights.
 - Reports should show evidence, not just scores.
+- Diagnostics should tell users what to **remove** (on saturated axes), not only what was detected.
 - New axes or rules should include mechanism explanations and citations when possible.
 - DeepSeek-specific experiments should record model name, layer, tokenizer, prompt pairs, and evaluation metadata.
 

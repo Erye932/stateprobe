@@ -59,26 +59,40 @@ This layer must stay honest: it is experimental and model-specific.
 
 StateProbe should focus on questions that matter for DeepSeek's future:
 
-1. **Reasoning budget control**
+1. **Meta-instruction interaction**
+   - DeepSeek's meta-instructions preset reasoning budget and task width to high baselines. How does user prompt pressure interact with these presets?
+   - Can we systematically identify which user instructions are redundant (overlapping with meta-instruction) vs valuable (covering gaps)?
+   - Does the "subtract on saturated axes, add on uncovered axes" principle hold across DeepSeek model versions?
+
+2. **Emotion vector connection**
+   - Anthropic's 2026 research proved 171 emotion vectors causally drive behavior in Claude. Do analogous vectors exist in DeepSeek open-weight models?
+   - Can we measure how persona prompts ("you are an expert") shift internal activation patterns toward caution/hedging?
+   - Anthropic found sycophancy increases with "happy"/"friendly" vectors. Can we reproduce this in DeepSeek and map it to the sycophancy axis?
+   - Can emotion vector measurements validate or calibrate StateProbe's static rule predictions?
+
+3. **Reasoning budget control**
    - When does a prompt request useful reasoning vs wasteful overthinking?
    - Can prompt edits preserve depth while reducing verbosity?
+   - Given that DeepSeek's meta-instructions already maximize reasoning effort, which user-side instructions actually improve output vs cause overload?
 
-2. **Self-verification**
+4. **Self-verification**
    - Which prompts reliably make DeepSeek check its own answer?
    - When does self-checking improve output quality, and when does it become performative?
 
-3. **Sycophancy and disagreement**
+5. **Sycophancy and disagreement**
    - Which prompt patterns make DeepSeek agree too easily?
    - Can prompts increase honest disagreement without making the model hostile?
+   - Anthropic showed that RLHF-trained friendliness paradoxically increases sycophancy. Does DeepSeek's post-training show the same pattern?
 
-4. **Task width drift**
+6. **Task width drift**
    - When does DeepSeek turn a narrow task into broad analysis?
    - How can prompts keep scope tight without losing useful context?
 
-5. **Future model migration**
+7. **Future model migration**
    - When a new DeepSeek model appears, do the same prompt patterns still work?
    - Do old axis vectors still project meaningfully?
    - Which behaviors improve, regress, or merely change style?
+   - Do meta-instruction presets change between versions, requiring recalibration?
 
 ## Vector boundary
 
