@@ -90,6 +90,10 @@ def check_required_files(result: Result) -> None:
         "stateprobe/detector.py",
         "stateprobe/lab/probe.py",
         "stateprobe/eval/scorer.py",
+        "benchmarks/deepseek_behavior_seed/schema.json",
+        "benchmarks/deepseek_behavior_seed/cases.jsonl",
+        "benchmarks/deepseek_behavior_seed/README.md",
+        "scripts/validate_benchmark.py",
     ]
     for path in required:
         result.check(exists(path), f"required file exists: {path}")
@@ -235,6 +239,8 @@ def check_cli_and_tests(result: Result) -> None:
         ]
     )
     result.check(code == 0, "Demo 0 check command runs", output[-1000:])
+    code, output = run_command([sys.executable, "scripts/validate_benchmark.py"])
+    result.check(code == 0 and "validation passed" in output, "benchmark validate passes", output[-1000:])
 
 
 def main() -> int:

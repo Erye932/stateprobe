@@ -15,6 +15,9 @@ All notable changes to StateProbe will be documented in this file.
 - Demo prompts for project decisions, code generation, teaching, and smart-but-not-answering cases.
 - Architecture, evidence model, FAQ, quality bar, and open-source project plan docs.
 - Automatic acceptance check for high-quality open-source readiness.
+- DeepSeek behavior benchmark seed: 8 cases covering all 8 axes with schema, validator, and CLI integration (`stateprobe benchmark validate`).
+- Decision log, public log, weekly review template.
+- Hard refusals and must-ask-user rules in operating rules.
 
 ### Known limitations
 
