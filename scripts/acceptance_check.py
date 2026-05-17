@@ -77,6 +77,7 @@ def check_required_files(result: Result) -> None:
         "docs/FAQ.md",
         "docs/QUALITY_BAR.md",
         "docs/OPEN_SOURCE_PLAN.md",
+        "docs/CONTRIBUTOR_VISIBILITY_PLAN.md",
         "docs/PUBLISHING.md",
         "docs/RELEASE_CHECKLIST.md",
         "demos/README.md",
@@ -107,6 +108,7 @@ def check_readme(result: Result) -> None:
         "docs/FAQ.md",
         "docs/QUALITY_BAR.md",
         "docs/OPEN_SOURCE_PLAN.md",
+        "docs/CONTRIBUTOR_VISIBILITY_PLAN.md",
         "docs/PUBLISHING.md",
         "CODE_OF_CONDUCT.md",
         "CITATION.cff",
@@ -126,6 +128,7 @@ def check_docs(result: Result) -> None:
     open_source = read("docs/OPEN_SOURCE_PLAN.md")
     quality = read("docs/QUALITY_BAR.md")
     deepseek_roadmap = read("docs/DEEPSEEK_ROADMAP.md")
+    visibility = read("docs/CONTRIBUTOR_VISIBILITY_PLAN.md")
     result.check("Static rule evidence" in evidence, "evidence model explains static evidence")
     result.check("Black-box behavior evidence" in evidence, "evidence model explains black-box evidence")
     result.check("Local activation evidence" in evidence, "evidence model explains local activation evidence")
@@ -136,6 +139,8 @@ def check_docs(result: Result) -> None:
     result.check("10k-star reference bar" in quality, "quality bar includes high-star benchmark")
     result.check("DeepSeek-first, not DeepSeek-only" in deepseek_roadmap, "DeepSeek roadmap states project focus")
     result.check("future DeepSeek models" in deepseek_roadmap, "DeepSeek roadmap covers future model migration")
+    result.check("90-day strategy" in visibility, "visibility plan has 90-day strategy")
+    result.check("DeepSeek behavior benchmark seed" in visibility, "visibility plan prioritizes benchmark seed")
     contributing = read("CONTRIBUTING.md")
     changelog = read("CHANGELOG.md")
     security = read("SECURITY.md")
@@ -143,6 +148,7 @@ def check_docs(result: Result) -> None:
     code_of_conduct = read("CODE_OF_CONDUCT.md")
     citation = read("CITATION.cff")
     result.check("python scripts/acceptance_check.py" in contributing, "contributing guide requires acceptance check")
+    result.check("https://github.com/Erye932/stateprobe.git" in contributing, "contributing guide uses real GitHub clone URL")
     result.check("Evidence discipline" in contributing, "contributing guide preserves evidence boundary")
     result.check("0.1.0 - Unreleased" in changelog, "changelog has unreleased version section")
     result.check("default `stateprobe check` command does not call external APIs" in security, "security policy states local-first default")

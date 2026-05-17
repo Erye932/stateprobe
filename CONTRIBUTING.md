@@ -30,7 +30,7 @@ A PR should not be considered ready if it:
 ## Development setup
 
 ```bash
-git clone https://github.com/yourname/stateprobe.git
+git clone https://github.com/Erye932/stateprobe.git
 cd stateprobe
 python -m pip install -e ".[dev]"
 python -m pytest tests -q

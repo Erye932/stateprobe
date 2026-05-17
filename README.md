@@ -67,6 +67,7 @@ StateProbe 会指出它的风险：
 - [`docs/FAQ.md`](docs/FAQ.md)：常见质疑和边界
 - [`docs/QUALITY_BAR.md`](docs/QUALITY_BAR.md)：对标高质量开源项目的验收门槛
 - [`docs/OPEN_SOURCE_PLAN.md`](docs/OPEN_SOURCE_PLAN.md)：完整开源项目计划
+- [`docs/CONTRIBUTOR_VISIBILITY_PLAN.md`](docs/CONTRIBUTOR_VISIBILITY_PLAN.md)：90 天开源贡献与传播计划
 - [`docs/PUBLISHING.md`](docs/PUBLISHING.md)：安全发布流程
 - [`CONTRIBUTING.md`](CONTRIBUTING.md)：贡献规则和 PR 验收标准
 - [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)：社区行为准则
