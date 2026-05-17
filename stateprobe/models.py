@@ -178,6 +178,31 @@ class TargetPreset:
                 )
 
 
+@dataclass(frozen=True)
+class ModelBaseline:
+    """The meta-instruction baseline of a specific model.
+
+    Models like DeepSeek preset certain axes to high values via system-level
+    meta-instructions. Prompt instructions that overlap with an already-saturated
+    axis cause overload, not improvement.
+
+    Principle: subtract on saturated axes, add on uncovered axes.
+    """
+
+    name: str
+    label_zh: str
+    description_zh: str
+    axis_baselines: Dict[Axis, float]  # 0.0-1.0, model's pre-set value per axis
+
+    def is_saturated(self, axis: Axis, threshold: float = 0.70) -> bool:
+        """True if the model's meta-instruction already sets this axis high."""
+        return self.axis_baselines.get(axis, 0.5) >= threshold
+
+    def is_uncovered(self, axis: Axis, threshold: float = 0.35) -> bool:
+        """True if the model's meta-instruction does NOT preset this axis."""
+        return self.axis_baselines.get(axis, 0.5) <= threshold
+
+
 @dataclass
 class AxisDelta:
     """How far the current reading is from the target on one axis."""
@@ -220,6 +245,17 @@ class RewriteSuggestion:
 
 
 @dataclass
+class BaselineOverlap:
+    """Warning that a user's prompt overlaps with a model's meta-instruction
+    on an axis that is already saturated — causing overload, not improvement."""
+
+    axis: Axis
+    user_pressure: float  # how much the prompt pushes this axis (0.5 = neutral)
+    model_baseline: float  # how much the meta-instruction already sets it
+    warning_zh: str
+
+
+@dataclass
 class Report:
     """The full diagnostic report for one prompt."""
 
@@ -228,6 +264,8 @@ class Report:
     target: TargetPreset
     deltas: Dict[Axis, AxisDelta]
     suggestions: List[RewriteSuggestion]
+    model_baseline: Optional["ModelBaseline"] = None
+    baseline_overlaps: List[BaselineOverlap] = field(default_factory=list)
 
     @property
     def pollution_sources(self) -> List[PollutionSource]:

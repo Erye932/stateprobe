@@ -7,6 +7,9 @@ import webbrowser
 from pathlib import Path
 from typing import Optional
 
+import io
+import os
+
 import click
 from rich.console import Console
 from rich.panel import Panel
@@ -29,10 +32,38 @@ from stateprobe.lab.probe import (
 from stateprobe.eval.client import DEFAULT_EVAL_MODEL, DEFAULT_BASE_URL
 from stateprobe.eval.scorer import BEHAVIOR_RUBRICS, run_eval
 from stateprobe.models import Axis, Report
-from stateprobe.rules import DEFAULT_TARGET, TARGET_PRESETS
+from stateprobe.rules import (
+    DEFAULT_MODEL_BASELINE,
+    DEFAULT_TARGET,
+    MODEL_BASELINES,
+    TARGET_PRESETS,
+)
 
 
-console = Console()
+def _ensure_utf8_windows() -> None:
+    """Force UTF-8 stdout/stderr on Windows to avoid GBK encoding errors
+    with Rich's Unicode bar characters (▓░┃ etc).
+    Only called at CLI entry — not at import time (avoids breaking pytest).
+    Skips when stdout has no buffer (e.g. Click CliRunner in tests)."""
+    if sys.platform != "win32":
+        return
+    if not hasattr(sys.stdout, "buffer"):
+        return
+    # Avoid wrapping if already UTF-8 or if buffer is a BytesIO (test runner).
+    if getattr(sys.stdout, "encoding", "").lower().replace("-", "") == "utf8":
+        return
+    try:
+        sys.stdout = io.TextIOWrapper(
+            sys.stdout.buffer, encoding="utf-8", errors="replace"
+        )
+        sys.stderr = io.TextIOWrapper(
+            sys.stderr.buffer, encoding="utf-8", errors="replace"
+        )
+    except (AttributeError, ValueError):
+        pass
+
+
+console = Console(force_terminal=True)
 
 
 # ---------------------------------------------------------------------------
@@ -189,6 +220,31 @@ def render_terminal(report: Report) -> None:
             )
         console.print(ptable)
 
+    # Baseline overlaps (meta-instruction warnings)
+    if report.baseline_overlaps:
+        console.print()
+        bl = report.model_baseline
+        bl_title = f"元指令重叠警告（模型: {bl.label_zh}）" if bl else "元指令重叠警告"
+        ol_table = Table(
+            title=f"\n{bl_title}",
+            title_style="bold white",
+            header_style="bold magenta",
+            border_style="magenta",
+            show_lines=True,
+        )
+        ol_table.add_column("轴", style="white")
+        ol_table.add_column("模型基线", justify="center", style="yellow")
+        ol_table.add_column("你的提示词", justify="center", style="cyan")
+        ol_table.add_column("诊断", style="bright_red")
+        for ov in report.baseline_overlaps:
+            ol_table.add_row(
+                ov.axis.label_zh,
+                f"{ov.model_baseline:.0%}",
+                f"{ov.user_pressure:.0%}",
+                ov.warning_zh,
+            )
+        console.print(ol_table)
+
     # Suggestions
     console.print()
     if not report.suggestions:
@@ -225,6 +281,7 @@ def main(ctx: click.Context) -> None:
     输入一段 prompt，诊断它激活了模型的哪些行为向量，
     给出污染源和改写建议。
     """
+    _ensure_utf8_windows()
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
 
@@ -260,6 +317,13 @@ def main(ctx: click.Context) -> None:
     default=False,
     help="不在终端打印报告（只生成 HTML）。",
 )
+@click.option(
+    "-m", "--model", "model_name",
+    type=click.Choice(list(MODEL_BASELINES), case_sensitive=False),
+    default=DEFAULT_MODEL_BASELINE,
+    show_default=True,
+    help="模型基线（元指令预设）。用于检测提示词与元指令的重叠。",
+)
 def check(
     prompt: Optional[str],
     file_path: Optional[str],
@@ -267,6 +331,7 @@ def check(
     html_path: Optional[str],
     auto_open: bool,
     no_terminal: bool,
+    model_name: str,
 ) -> None:
     """诊断一段 prompt 的状态向量。
 
@@ -275,9 +340,11 @@ def check(
       stateprobe check "你是资深专家，请全面分析这个项目"
 
       stateprobe check --file my_prompt.txt --target super_thinking_max --html report.html --open
+
+      stateprobe check "think step by step" --model generic
     """
     text = _read_prompt(prompt, file_path)
-    report = diagnose(text, target_name=target_name)
+    report = diagnose(text, target_name=target_name, model_name=model_name)
 
     if not no_terminal:
         render_terminal(report)

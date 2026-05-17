@@ -48,6 +48,8 @@ def run_command(args: list[str]) -> tuple[int, str]:
         args,
         cwd=ROOT,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )

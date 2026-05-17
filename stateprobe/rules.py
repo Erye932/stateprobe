@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from stateprobe.models import Axis, Rule, TargetPreset
+from stateprobe.models import Axis, ModelBaseline, Rule, TargetPreset
 
 
 # ---------------------------------------------------------------------------
@@ -859,3 +859,50 @@ def get_target(name: str) -> TargetPreset:
             f"Unknown target preset {name!r}. Available: {list(TARGET_PRESETS)}"
         )
     return TARGET_PRESETS[name]
+
+
+# ---------------------------------------------------------------------------
+# Model baselines (meta-instruction presets)
+# ---------------------------------------------------------------------------
+# Each model's system-level meta-instructions preset certain axes.
+# These baselines are derived from published meta-instructions and observed
+# behavior. See docs/EVIDENCE_MODEL.md for methodology.
+
+MODEL_BASELINES: Dict[str, ModelBaseline] = {
+    "deepseek": ModelBaseline(
+        name="deepseek",
+        label_zh="DeepSeek-Chat / R1",
+        description_zh=(
+            "DeepSeek 元指令预设：推理预算极高（'尽最大努力，不允许捷径'）、"
+            "任务宽度高（'所有潜在路径'）、自我验证高（'记录每一步'）。"
+            "成功标准、信息流向、果断性未预设。"
+        ),
+        axis_baselines={
+            Axis.SYCOPHANCY: 0.55,
+            Axis.TASK_WIDTH: 0.80,
+            Axis.SUCCESS_CRITERIA: 0.30,
+            Axis.REASONING_BUDGET: 0.85,
+            Axis.IDENTITY_STRENGTH: 0.50,
+            Axis.ASSERTIVENESS: 0.35,
+            Axis.SELF_VERIFICATION: 0.75,
+            Axis.INFO_FLOW: 0.30,
+        },
+    ),
+    "generic": ModelBaseline(
+        name="generic",
+        label_zh="通用模型（无元指令假设）",
+        description_zh="不假设任何元指令预设，所有轴基线为 0.5。",
+        axis_baselines={axis: 0.50 for axis in Axis},
+    ),
+}
+
+DEFAULT_MODEL_BASELINE = "deepseek"
+
+
+def get_model_baseline(name: str) -> ModelBaseline:
+    """Return the named model baseline (raises KeyError if not found)."""
+    if name not in MODEL_BASELINES:
+        raise KeyError(
+            f"Unknown model baseline {name!r}. Available: {list(MODEL_BASELINES)}"
+        )
+    return MODEL_BASELINES[name]
