@@ -26,8 +26,10 @@ from stateprobe.models import (
     PollutionSource,
     Report,
     Rule,
+    StructuralWarning,
     TargetPreset,
 )
+from stateprobe.structural import detect_structural_issues
 from stateprobe.rules import (
     ALL_RULES,
     DEFAULT_MODEL_BASELINE,
@@ -285,6 +287,7 @@ def diagnose(
     deltas = compute_deltas(readings, target)
     suggestions = suggest_rewrite(readings, deltas, target)
     overlaps = _detect_overlaps(readings, baseline, target) if baseline else []
+    structural_warnings = detect_structural_issues(prompt)
 
     return Report(
         prompt=prompt,
@@ -294,4 +297,5 @@ def diagnose(
         suggestions=suggestions,
         model_baseline=baseline,
         baseline_overlaps=overlaps,
+        structural_warnings=structural_warnings,
     )

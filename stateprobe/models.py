@@ -256,6 +256,23 @@ class BaselineOverlap:
 
 
 @dataclass
+class StructuralWarning:
+    """A warning about the prompt's structure (not its semantic content).
+
+    Distinct from axis-based diagnostics. Covers prompt-level concerns like:
+    - Excessive length that may dilute key instructions
+    - Redundant/repeated phrasing that wastes CSA-compressed attention
+    - Multi-document concatenation without clear section markers
+    """
+
+    kind: str  # "length" | "redundancy" | "filler" | "synonym_stacking"
+    severity: str  # "info" | "warning" | "critical"
+    message_zh: str
+    matched_text: Optional[str] = None
+    suggestion_zh: Optional[str] = None
+
+
+@dataclass
 class Report:
     """The full diagnostic report for one prompt."""
 
@@ -266,6 +283,7 @@ class Report:
     suggestions: List[RewriteSuggestion]
     model_baseline: Optional["ModelBaseline"] = None
     baseline_overlaps: List[BaselineOverlap] = field(default_factory=list)
+    structural_warnings: List[StructuralWarning] = field(default_factory=list)
 
     @property
     def pollution_sources(self) -> List[PollutionSource]:

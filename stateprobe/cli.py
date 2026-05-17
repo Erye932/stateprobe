@@ -245,6 +245,41 @@ def render_terminal(report: Report) -> None:
             )
         console.print(ol_table)
 
+    # Structural warnings (length / redundancy / synonym stacking / filler)
+    if report.structural_warnings:
+        console.print()
+        sw_table = Table(
+            title="\n结构警告（V4 CSA 压缩相关）",
+            title_style="bold white",
+            header_style="bold yellow",
+            border_style="yellow",
+            show_lines=True,
+        )
+        sw_table.add_column("严重度", style="white", no_wrap=True)
+        sw_table.add_column("类型", style="cyan", no_wrap=True)
+        sw_table.add_column("诊断", style="white")
+        sw_table.add_column("建议", style="bright_blue")
+        _severity_styles = {
+            "critical": ("[bold red]严重[/bold red]", "red"),
+            "warning": ("[bold yellow]警告[/bold yellow]", "yellow"),
+            "info": ("[dim]提示[/dim]", "dim"),
+        }
+        _kind_zh = {
+            "length": "长度",
+            "redundancy": "重复",
+            "synonym_stacking": "同义词堆叠",
+            "filler": "填充副词",
+        }
+        for w in report.structural_warnings:
+            sev_label, _ = _severity_styles.get(w.severity, (w.severity, "white"))
+            sw_table.add_row(
+                sev_label,
+                _kind_zh.get(w.kind, w.kind),
+                w.message_zh,
+                w.suggestion_zh or "",
+            )
+        console.print(sw_table)
+
     # Suggestions
     console.print()
     if not report.suggestions:

@@ -187,6 +187,34 @@ stateprobe check --file my_prompt.txt
 stateprobe check --target super_thinking_max "评估这个架构能不能扛 100 万用户"
 ```
 
+### 指定模型基线（支持 DeepSeek V4）
+
+```bash
+# V4-Pro thinking mode（默认 deepseek-reasoner endpoint）
+stateprobe check --model v4-pro "你的提示词..."
+
+# V4-Flash non-thinking 模式（速度优化）
+stateprobe check --model v4-flash "你的提示词..."
+
+# R1 / V3.1 时代（默认）
+stateprobe check --model deepseek "你的提示词..."
+
+# 无基线假设（通用模型）
+stateprobe check --model generic "你的提示词..."
+```
+
+V4 baseline 差异：
+- **v4-pro**：推理预算 90%、自我验证 80%、任务宽度 75%（thinking mode 进一步强化）
+- **v4-flash**：推理预算 50%、自我验证 40%、果断性 55%（无 extended thinking）
+
+### 结构警告（V4 CSA 压缩感知）
+
+StateProbe 自动检测以下结构问题（独立于 8 轴诊断）：
+- **长度警告**：>10K 字符触发，>50K 字符告警（V4 1M context 下关键指令稀释风险）
+- **字符重复**：`请请请请` 这类重复在 CSA 压缩下会被折叠
+- **同义词堆叠**：`彻底全面深入仔细完整` 触发同一行为方向，叠加无新增信号
+- **填充强度副词**：`一定要 / 务必` 等不带具体约束的强度词
+
 ### 生成 HTML 报告并打开浏览器
 
 ```bash

@@ -897,6 +897,44 @@ MODEL_BASELINES: Dict[str, ModelBaseline] = {
             Axis.INFO_FLOW: 0.30,
         },
     ),
+    "v4-pro": ModelBaseline(
+        name="v4-pro",
+        label_zh="DeepSeek V4-Pro (thinking mode)",
+        description_zh=(
+            "V4-Pro（1.6T 参数 / 49B 激活，thinking=True）：在 R1 元指令基础上"
+            "进一步强化。CSA 压缩注意力让长 CoT 更经济，因此推理预算基线更高、"
+            "自我验证更彻底；任务宽度因 1M context 反而略收（模型能保持更长 focus）。"
+        ),
+        axis_baselines={
+            Axis.SYCOPHANCY: 0.55,
+            Axis.TASK_WIDTH: 0.75,
+            Axis.SUCCESS_CRITERIA: 0.30,
+            Axis.REASONING_BUDGET: 0.90,
+            Axis.IDENTITY_STRENGTH: 0.50,
+            Axis.ASSERTIVENESS: 0.40,
+            Axis.SELF_VERIFICATION: 0.80,
+            Axis.INFO_FLOW: 0.30,
+        },
+    ),
+    "v4-flash": ModelBaseline(
+        name="v4-flash",
+        label_zh="DeepSeek V4-Flash (non-thinking)",
+        description_zh=(
+            "V4-Flash（284B / 13B 激活，thinking=False）：速度优化版本。"
+            "推理预算基线低（无 extended thinking）、自我验证低、果断性更高、"
+            "任务宽度较窄。适合批量、低延迟、明确指令的执行类任务。"
+        ),
+        axis_baselines={
+            Axis.SYCOPHANCY: 0.60,
+            Axis.TASK_WIDTH: 0.55,
+            Axis.SUCCESS_CRITERIA: 0.30,
+            Axis.REASONING_BUDGET: 0.50,
+            Axis.IDENTITY_STRENGTH: 0.50,
+            Axis.ASSERTIVENESS: 0.55,
+            Axis.SELF_VERIFICATION: 0.40,
+            Axis.INFO_FLOW: 0.30,
+        },
+    ),
     "generic": ModelBaseline(
         name="generic",
         label_zh="通用模型（无元指令假设）",
