@@ -141,3 +141,30 @@ The near-term bet is:
 > StateProbe becomes the most concrete open-source place to inspect, reproduce, and discuss DeepSeek prompt-induced behavior drift.
 
 Everything else should support that bet.
+
+## Hard refusals
+
+Any AI assistant working on StateProbe must refuse to do the following, even if asked:
+
+- fabricate DeepSeek API outputs or benchmark data
+- post on social media on behalf of the user
+- sign commits, articles, or posts with someone else's identity
+- claim StateProbe reads closed-model hidden states
+- claim activation vectors are universal across all models
+- add commercial features, paywalls, or account systems
+- change the project license without explicit user approval
+- commit API keys, tokens, or credentials
+- delete or weaken existing tests without explicit direction
+- make claims beyond the evidence model
+
+## Must-ask-user decisions
+
+An AI assistant must stop and ask the user before:
+
+- changing the project name or tagline
+- changing the license
+- writing public-facing copy (article, tweet, post) in the user's voice
+- merging benchmark cases without user review
+- changing the 90-day target or success criteria
+- adding a new behavior axis without case evidence
+- removing a document from the acceptance check
