@@ -147,7 +147,32 @@ DeepSeek 方向详见 [`docs/DEEPSEEK_ROADMAP.md`](docs/DEEPSEEK_ROADMAP.md)：�
 
 ---
 
-## 安装
+## 安装（中国大陆指南）
+
+### 方式 1：SSH clone（推荐）
+
+HTTPS 直连 GitHub 在中国经常超时。SSH-over-443 走另一条链路，**实测稳定可达**。
+
+**如果你还没配过 SSH 公钥**，先做这一步（一次性，3 分钟）：
+
+```bash
+# 1. 生成密钥（一路回车即可）
+ssh-keygen -t ed25519 -C "你的邮箱"
+
+# 2. 复制公钥
+# Windows PowerShell:
+cat ~/.ssh/id_ed25519.pub | clip
+# macOS / Linux:
+cat ~/.ssh/id_ed25519.pub | pbcopy   # 或 xclip
+
+# 3. 打开 https://github.com/settings/keys → New SSH key → 粘贴 → 保存
+
+# 4. 测试是否成功
+ssh -T -p 443 git@ssh.github.com
+# 看到 "Hi xxx! You've authenticated" 就行
+```
+
+**然后 clone + 安装：**
 
 ```bash
 git clone ssh://git@ssh.github.com:443/Erye932/stateprobe.git
@@ -155,9 +180,17 @@ cd stateprobe
 pip install -e .
 ```
 
-> ℹ️ 用 SSH-over-443 而非 HTTPS：中国大陆 HTTPS 直连 GitHub 经常超时，SSH-over-443 走的是另一条链路、稳定可达。需先在 [GitHub Settings](https://github.com/settings/keys) 加入你的 SSH 公钥（一次性，5 分钟）。
+### 方式 2：直接下载 ZIP（不用 Git）
 
-装好之后，**输 `stateprobe` 看欢迎屏，立刻知道要做什么**：
+不想配 SSH？直接下载：
+
+1. 打开 https://github.com/Erye932/stateprobe/archive/refs/heads/main.zip
+2. 解压，进入 `stateprobe-main` 文件夹
+3. 运行 `pip install -e .`
+
+> 如果 pip 下载慢，加清华镜像：`pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple`
+
+### 装完了？直接输 `stateprobe`
 
 ```bash
 $ stateprobe
@@ -173,6 +206,8 @@ $ stateprobe
 │    stateprobe check "..."                        │
 └──────────────────────────────────────────────────┘
 ```
+
+> ⚠️ **Windows 终端显示**：如果看到乱码（鈹€鈹?），请使用 **Windows Terminal**（Win11 自带 / [Win10 从 Microsoft Store 安装](https://aka.ms/terminal)）而非旧版 `cmd.exe`。StateProbe 启动时会自动设置 UTF-8 编码（CP65001），但旧版终端的字体可能不支持 box-drawing 字符。
 
 依赖很轻：`click`, `rich`。**无 LLM API 调用**——纯规则引擎、零成本、毫秒响应、可离线。
 

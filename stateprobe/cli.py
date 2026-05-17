@@ -41,15 +41,30 @@ from stateprobe.rules import (
 
 
 def _ensure_utf8_windows() -> None:
-    """Force UTF-8 stdout/stderr on Windows to avoid GBK encoding errors
-    with Rich's Unicode bar characters (▓░┃ etc).
-    Only called at CLI entry — not at import time (avoids breaking pytest).
-    Skips when stdout has no buffer (e.g. Click CliRunner in tests)."""
+    """Force UTF-8 stdout/stderr on Windows to avoid GBK/CP936 encoding errors.
+
+    Chinese Windows defaults to CP936 (GBK). Rich outputs UTF-8 box-drawing
+    characters (▓░┃┌─┐ etc.) and Chinese text, which become garbled under GBK.
+
+    This function:
+    1. Sets the Windows console output code page to 65001 (UTF-8) via kernel32.
+    2. Wraps sys.stdout/stderr with UTF-8 TextIOWrapper.
+
+    Called both at module-level (for Console init) and per-command (safety net).
+    Skips when stdout has no buffer (e.g. Click CliRunner in tests).
+    """
     if sys.platform != "win32":
         return
+    # Step 1: Set Windows console code page to UTF-8
+    try:
+        import ctypes
+        ctypes.windll.kernel32.SetConsoleOutputCP(65001)
+        ctypes.windll.kernel32.SetConsoleCP(65001)
+    except (AttributeError, OSError):
+        pass
     if not hasattr(sys.stdout, "buffer"):
         return
-    # Avoid wrapping if already UTF-8 or if buffer is a BytesIO (test runner).
+    # Step 2: Wrap stdout/stderr with UTF-8 encoding
     if getattr(sys.stdout, "encoding", "").lower().replace("-", "") == "utf8":
         return
     try:
@@ -62,6 +77,9 @@ def _ensure_utf8_windows() -> None:
     except (AttributeError, ValueError):
         pass
 
+
+# Apply UTF-8 fix BEFORE Console init so Rich sees UTF-8 stdout.
+_ensure_utf8_windows()
 
 console = Console(force_terminal=True)
 
