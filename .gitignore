@@ -48,3 +48,6 @@ demo_report.html
 .env
 .env.*
 *.key
+
+# Drafts (unpublished articles, not for public repo)
+drafts/
