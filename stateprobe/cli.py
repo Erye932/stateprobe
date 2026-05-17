@@ -168,6 +168,16 @@ def render_terminal(report: Report) -> None:
     info.append(report.target.description_zh, style="grey50")
     console.print(Panel(info, border_style="grey39", title="输入"))
 
+    # Trivial prompt notice
+    if report.is_trivial:
+        console.print(Panel(
+            "[bold yellow]提示词内容过少，无法有效诊断。[/bold yellow]\n"
+            "以下读数仅反映模型默认行为（baseline），不是你的提示词效果。\n"
+            "请输入一个有实际指令的 prompt 再试。",
+            title="⚠ 空诊断",
+            border_style="yellow",
+        ))
+
     # Axis readings table
     table = Table(
         title="\n各轴读数（▓ = 当前激活，┃ = 目标坐标）",

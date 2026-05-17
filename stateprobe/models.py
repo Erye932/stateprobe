@@ -284,6 +284,7 @@ class Report:
     model_baseline: Optional["ModelBaseline"] = None
     baseline_overlaps: List[BaselineOverlap] = field(default_factory=list)
     structural_warnings: List[StructuralWarning] = field(default_factory=list)
+    is_trivial: bool = False
 
     @property
     def pollution_sources(self) -> List[PollutionSource]:

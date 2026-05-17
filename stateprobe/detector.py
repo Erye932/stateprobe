@@ -268,6 +268,11 @@ def _detect_overlaps(
     return overlaps
 
 
+# Minimum character threshold for "non-trivial" prompt content.
+# Below this, readings reflect baseline defaults and suggestions are suppressed.
+_TRIVIAL_PROMPT_THRESHOLD = 10
+
+
 def diagnose(
     prompt: str,
     target_name: str = DEFAULT_TARGET,
@@ -285,9 +290,21 @@ def diagnose(
     baseline = get_model_baseline(model_name) if model_name else None
     readings = detect_readings(prompt, baseline=baseline)
     deltas = compute_deltas(readings, target)
-    suggestions = suggest_rewrite(readings, deltas, target)
-    overlaps = _detect_overlaps(readings, baseline, target) if baseline else []
     structural_warnings = detect_structural_issues(prompt)
+
+    # Detect trivial prompts: very short AND no rules matched.
+    # In this case, readings are just baseline defaults — there's nothing
+    # in the prompt to rewrite, so suggestions and overlap warnings are noise.
+    total_sources = sum(len(r.contributing_sources) for r in readings.values())
+    stripped = prompt.strip() if prompt else ""
+    is_trivial = (len(stripped) < _TRIVIAL_PROMPT_THRESHOLD and total_sources == 0)
+
+    if is_trivial:
+        suggestions = []
+        overlaps = []
+    else:
+        suggestions = suggest_rewrite(readings, deltas, target)
+        overlaps = _detect_overlaps(readings, baseline, target) if baseline else []
 
     return Report(
         prompt=prompt,
@@ -298,4 +315,5 @@ def diagnose(
         model_baseline=baseline,
         baseline_overlaps=overlaps,
         structural_warnings=structural_warnings,
+        is_trivial=is_trivial,
     )
