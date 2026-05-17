@@ -61,6 +61,7 @@ StateProbe 会指出它的风险：
 
 - [`docs/PROJECT_BRIEF.md`](docs/PROJECT_BRIEF.md)：人话版项目说明
 - [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md)：统一项目总计划
+- [`docs/OPERATING_RULES.md`](docs/OPERATING_RULES.md)：项目执行规约（Visibility-first, engineering-grounded）
 - [`docs/DEMO_WALKTHROUGH.md`](docs/DEMO_WALKTHROUGH.md)：可验收 demo
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)：架构和数据流
 - [`docs/EVIDENCE_MODEL.md`](docs/EVIDENCE_MODEL.md)：三层证据模型

@@ -4,6 +4,8 @@ This plan turns StateProbe from a working MVP into a credible open-source projec
 
 For the unified project roadmap, see [`PROJECT_PLAN.md`](PROJECT_PLAN.md).
 
+For the project execution rule (visibility-first, engineering-grounded), see [`OPERATING_RULES.md`](OPERATING_RULES.md).
+
 For the 90-day contributor visibility plan, see [`CONTRIBUTOR_VISIBILITY_PLAN.md`](CONTRIBUTOR_VISIBILITY_PLAN.md).
 
 ## Project positioning

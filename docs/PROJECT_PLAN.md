@@ -4,6 +4,8 @@ StateProbe is a DeepSeek-first behavior debugger and research toolbox for prompt
 
 This document is the unified project plan. It connects the product, research, engineering, benchmark, community, and visibility tracks into one execution roadmap.
 
+The execution rule for every contributor and AI assistant working on this project is defined in [`OPERATING_RULES.md`](OPERATING_RULES.md): visibility-first, engineering-grounded.
+
 ## North star
 
 StateProbe should become the open-source reference for this question:

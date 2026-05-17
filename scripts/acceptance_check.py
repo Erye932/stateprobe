@@ -71,6 +71,7 @@ def check_required_files(result: Result) -> None:
         ".github/ISSUE_TEMPLATE/rule_request.md",
         "docs/PROJECT_BRIEF.md",
         "docs/PROJECT_PLAN.md",
+        "docs/OPERATING_RULES.md",
         "docs/DEMO_WALKTHROUGH.md",
         "docs/ARCHITECTURE.md",
         "docs/EVIDENCE_MODEL.md",
@@ -104,6 +105,7 @@ def check_readme(result: Result) -> None:
         "Black-box Eval",
         "DeepSeek Lab",
         "docs/PROJECT_PLAN.md",
+        "docs/OPERATING_RULES.md",
         "docs/ARCHITECTURE.md",
         "docs/EVIDENCE_MODEL.md",
         "docs/DEEPSEEK_ROADMAP.md",
@@ -129,6 +131,7 @@ def check_docs(result: Result) -> None:
     faq = read("docs/FAQ.md")
     open_source = read("docs/OPEN_SOURCE_PLAN.md")
     project_plan = read("docs/PROJECT_PLAN.md")
+    operating_rules = read("docs/OPERATING_RULES.md")
     quality = read("docs/QUALITY_BAR.md")
     deepseek_roadmap = read("docs/DEEPSEEK_ROADMAP.md")
     visibility = read("docs/CONTRIBUTOR_VISIBILITY_PLAN.md")
@@ -141,6 +144,9 @@ def check_docs(result: Result) -> None:
     result.check("North star" in project_plan, "project plan defines north star")
     result.check("Version roadmap" in project_plan, "project plan defines version roadmap")
     result.check("First 30 days" in project_plan, "project plan defines first 30 days")
+    result.check("Visibility-first, engineering-grounded" in operating_rules, "operating rules state core rule")
+    result.check("Mandatory AI execution rule" in operating_rules, "operating rules define AI execution rule")
+    result.check("five gates" in operating_rules, "operating rules define the five gates")
     result.check("GitHub launch checklist" in open_source, "open-source plan includes launch checklist")
     result.check("10k-star reference bar" in quality, "quality bar includes high-star benchmark")
     result.check("DeepSeek-first, not DeepSeek-only" in deepseek_roadmap, "DeepSeek roadmap states project focus")
