@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DeepSeek Behavior Benchmark Case",
+  "description": "A single prompt behavior case for the DeepSeek behavior benchmark seed.",
+  "type": "object",
+  "required": [
+    "id",
+    "axis",
+    "failure_mode",
+    "bad_prompt",
+    "improved_prompt",
+    "expected_behavior_change",
+    "static_diagnosis_summary"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$",
+      "description": "Unique case identifier, snake_case."
+    },
+    "axis": {
+      "type": "string",
+      "enum": [
+        "sycophancy",
+        "task_width",
+        "success_criteria",
+        "reasoning_budget",
+        "identity_strength",
+        "assertiveness",
+        "self_verification",
+        "info_flow"
+      ],
+      "description": "The behavior axis this case targets."
+    },
+    "failure_mode": {
+      "type": "string",
+      "description": "Short description of the failure behavior."
+    },
+    "bad_prompt": {
+      "type": "string",
+      "description": "The original prompt that triggers the failure behavior."
+    },
+    "improved_prompt": {
+      "type": "string",
+      "description": "The rewritten prompt that reduces the failure behavior."
+    },
+    "expected_behavior_change": {
+      "type": "string",
+      "description": "What should change in model output after rewrite."
+    },
+    "static_diagnosis_summary": {
+      "type": "string",
+      "description": "Summary of what stateprobe check would flag."
+    },
+    "deepseek_output_before": {
+      "type": "string",
+      "description": "Optional: actual DeepSeek API output for bad_prompt."
+    },
+    "deepseek_output_after": {
+      "type": "string",
+      "description": "Optional: actual DeepSeek API output for improved_prompt."
+    },
+    "human_note": {
+      "type": "string",
+      "description": "Optional: human judgment on this case."
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional: additional tags for filtering."
+    }
+  },
+  "additionalProperties": false
+}

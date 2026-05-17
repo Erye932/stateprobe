@@ -693,5 +693,33 @@ def eval_run(
     console.print()
 
 
+# ---------------------------------------------------------------------------
+# benchmark — DeepSeek behavior benchmark seed
+# ---------------------------------------------------------------------------
+
+@main.group()
+def benchmark() -> None:
+    """DeepSeek 行为 benchmark：验证和管理 prompt 行为案例库。"""
+
+
+@benchmark.command("validate")
+def benchmark_validate() -> None:
+    """校验 benchmark cases.jsonl 的格式和完整性。"""
+    import subprocess
+    script = Path(__file__).resolve().parent.parent / "scripts" / "validate_benchmark.py"
+    result = subprocess.run(
+        [sys.executable, str(script)],
+        cwd=str(script.parent.parent),
+        capture_output=True,
+        text=True,
+    )
+    if result.stdout:
+        console.print(result.stdout.rstrip())
+    if result.stderr:
+        console.print(result.stderr.rstrip(), style="red")
+    if result.returncode != 0:
+        raise SystemExit(result.returncode)
+
+
 if __name__ == "__main__":
     main()
