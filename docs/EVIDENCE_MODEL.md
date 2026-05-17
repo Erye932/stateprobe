@@ -2,6 +2,8 @@
 
 StateProbe separates three evidence types so users can tell whether a diagnosis comes from static prompt signals, black-box behavior, or local hidden-state activations.
 
+The project is **DeepSeek-first**: static diagnosis helps before API calls, black-box eval should prioritize DeepSeek API and future DeepSeek-compatible models, and local activation probing focuses on open-weight DeepSeek-family models.
+
 ## Why evidence types matter
 
 The most important credibility rule is:
@@ -15,8 +17,8 @@ StateProbe can be useful before direct activations are available, but it should 
 | Evidence type | Source | Strength | Limitation |
 |---|---|---|---|
 | Static rule evidence | Prompt spans matched by explicit rules | Fast, offline, explainable | Proxy only; not hidden-state access |
-| Black-box behavior evidence | Model outputs judged across axes | Tests actual behavior | Needs API; judge can be imperfect |
-| Local activation evidence | Open-weight model hidden states | Closest to mechanistic evidence | Model-specific; experimental |
+| Black-box behavior evidence | DeepSeek API or compatible model outputs judged across axes | Tests actual behavior | Needs API; judge can be imperfect |
+| Local activation evidence | Open-weight DeepSeek-family model hidden states | Closest to mechanistic evidence | Model-specific; experimental |
 | Hybrid evidence | Agreement across multiple sources | Stronger practical confidence | Requires more setup |
 
 ## Static rule evidence
@@ -77,6 +79,8 @@ projection = cosine(prompt_hidden_state, axis_vector)
 ```
 
 This is the closest layer to mechanistic interpretability in the current project, but it is model-specific and experimental.
+
+For DeepSeek, this layer should be used to compare behavior directions across local DeepSeek-family checkpoints, not to claim universal vectors. If future DeepSeek models do not expose useful local hidden states, StateProbe should still continue through static diagnosis, black-box eval, and benchmark tracking.
 
 ## Confidence roadmap
 

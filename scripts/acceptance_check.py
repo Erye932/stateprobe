@@ -73,6 +73,7 @@ def check_required_files(result: Result) -> None:
         "docs/DEMO_WALKTHROUGH.md",
         "docs/ARCHITECTURE.md",
         "docs/EVIDENCE_MODEL.md",
+        "docs/DEEPSEEK_ROADMAP.md",
         "docs/FAQ.md",
         "docs/QUALITY_BAR.md",
         "docs/OPEN_SOURCE_PLAN.md",
@@ -102,6 +103,7 @@ def check_readme(result: Result) -> None:
         "DeepSeek Lab",
         "docs/ARCHITECTURE.md",
         "docs/EVIDENCE_MODEL.md",
+        "docs/DEEPSEEK_ROADMAP.md",
         "docs/FAQ.md",
         "docs/QUALITY_BAR.md",
         "docs/OPEN_SOURCE_PLAN.md",
@@ -123,13 +125,17 @@ def check_docs(result: Result) -> None:
     faq = read("docs/FAQ.md")
     open_source = read("docs/OPEN_SOURCE_PLAN.md")
     quality = read("docs/QUALITY_BAR.md")
+    deepseek_roadmap = read("docs/DEEPSEEK_ROADMAP.md")
     result.check("Static rule evidence" in evidence, "evidence model explains static evidence")
     result.check("Black-box behavior evidence" in evidence, "evidence model explains black-box evidence")
     result.check("Local activation evidence" in evidence, "evidence model explains local activation evidence")
     result.check("just a bunch of regex" in faq, "FAQ answers regex objection")
     result.check("Does StateProbe read real activations?" in faq, "FAQ answers activation objection")
+    result.check("Is StateProbe only for DeepSeek-R1?" in faq, "FAQ answers DeepSeek-only objection")
     result.check("GitHub launch checklist" in open_source, "open-source plan includes launch checklist")
     result.check("10k-star reference bar" in quality, "quality bar includes high-star benchmark")
+    result.check("DeepSeek-first, not DeepSeek-only" in deepseek_roadmap, "DeepSeek roadmap states project focus")
+    result.check("future DeepSeek models" in deepseek_roadmap, "DeepSeek roadmap covers future model migration")
     contributing = read("CONTRIBUTING.md")
     changelog = read("CHANGELOG.md")
     security = read("SECURITY.md")

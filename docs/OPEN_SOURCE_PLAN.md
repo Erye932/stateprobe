@@ -6,11 +6,11 @@ This plan turns StateProbe from a working MVP into a credible open-source projec
 
 Recommended tagline:
 
-> A debugger for prompts and LLM behavior.
+> A debugger for prompts and LLM behavior, DeepSeek-first.
 
 Longer positioning:
 
-> StateProbe helps developers see whether a prompt is likely to make an LLM actually answer, or drift into rambling, sycophancy, role-play, overthinking, or vague expert analysis.
+> StateProbe helps developers and researchers see whether a prompt is likely to make a DeepSeek-style reasoning model actually answer, or drift into rambling, sycophancy, role-play, overthinking, or vague expert analysis.
 
 ## Target audience
 
@@ -25,6 +25,7 @@ Secondary:
 - AI interpretability readers
 - Evaluation and reliability engineers
 - Researchers interested in activation vectors and behavioral states
+- DeepSeek users who want reproducible prompt behavior debugging
 
 ## Release tracks
 
@@ -60,6 +61,7 @@ Deliverables:
 - Explain Static Mode as proxy evidence
 - Explain Black-box Eval as behavioral evidence
 - Explain DeepSeek Lab as local activation evidence
+- Link the DeepSeek-first roadmap and explain the model boundary
 - Add confidence labels in a future version
 
 ### Track 4: Accuracy benchmark
@@ -83,6 +85,18 @@ Deliverables:
 - Save/load axis vectors
 - More reproducible layer and model metadata
 - Clear experimental warnings
+- Cross-check behavior directions across future DeepSeek-family checkpoints
+
+### Track 5.5: DeepSeek model migration
+
+Goal: make StateProbe useful when DeepSeek releases new models.
+
+Deliverables:
+
+- Repeatable prompt benchmark for DeepSeek API and future DeepSeek-compatible endpoints
+- Model migration notes for reasoning budget, self-verification, sycophancy, and task width drift
+- Comparison report between old and new DeepSeek-family behavior
+- Clear distinction between black-box output changes and local activation changes
 
 ### Track 6: Developer workflow
 
@@ -118,6 +132,7 @@ Recommended V0.2:
 - Standalone answer-quality check design
 - Small benchmark scaffold
 - Better DeepSeek Lab vector persistence
+- DeepSeek behavior benchmark scaffold
 - HTML report with clearer evidence sections
 
 ## What not to prioritize yet

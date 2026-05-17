@@ -1,6 +1,6 @@
 # StateProbe Architecture
 
-StateProbe is built as a three-layer debugger for prompt-induced LLM behavior: fast static diagnosis, optional black-box output evaluation, and experimental local activation probing.
+StateProbe is built as a DeepSeek-first three-layer debugger for prompt-induced LLM behavior: fast static diagnosis, optional DeepSeek black-box output evaluation, and experimental local activation probing on open-weight DeepSeek-family models.
 
 ## System overview
 
@@ -32,8 +32,8 @@ optional:
 | `stateprobe/rewriter.py` | Generates rewrite suggestions from axis deltas |
 | `stateprobe/html_report.py` | Builds self-contained HTML reports |
 | `stateprobe/cli.py` | User-facing CLI commands |
-| `stateprobe/eval/` | Black-box output comparison through OpenAI-compatible APIs |
-| `stateprobe/lab/` | Experimental local hidden-state probing with DeepSeek-R1-Distill |
+| `stateprobe/eval/` | Black-box output comparison through DeepSeek API or OpenAI-compatible APIs |
+| `stateprobe/lab/` | Experimental local hidden-state probing with DeepSeek-family open-weight models |
 
 ## Three execution modes
 
@@ -55,7 +55,7 @@ Optional command:
 stateprobe eval run --original-file bad.txt --rewritten-file good.txt
 ```
 
-Black-box Eval sends the original and rewritten prompts to a target model, then asks a judge model to compare output behavior across the same axes.
+Black-box Eval sends the original and rewritten prompts to a target model, then asks a judge model to compare output behavior across the same axes. The default route is DeepSeek-first, while still allowing OpenAI-compatible endpoints for comparison.
 
 ### DeepSeek Lab
 
@@ -65,7 +65,7 @@ Experimental command:
 stateprobe lab probe "请一步一步推理，假设你是错的再修正" --axis reasoning_budget
 ```
 
-DeepSeek Lab loads an open-weight model locally, extracts hidden states, builds contrastive axis vectors, and projects a new prompt onto those vectors.
+DeepSeek Lab loads an open-weight DeepSeek-family model locally, extracts hidden states, builds contrastive axis vectors, and projects a new prompt onto those vectors.
 
 ## Data flow
 
@@ -107,6 +107,7 @@ positive/negative contrastive pairs
 - DeepSeek Lab must be optional because it needs heavy dependencies and model weights.
 - Reports should show evidence, not just scores.
 - New axes or rules should include mechanism explanations and citations when possible.
+- DeepSeek-specific experiments should record model name, layer, tokenizer, prompt pairs, and evaluation metadata.
 
 ## Current limitations
 

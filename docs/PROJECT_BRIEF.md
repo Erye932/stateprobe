@@ -147,17 +147,20 @@ stateprobe eval run "原 prompt" "改写 prompt"
 - 记录 StateProbe 诊断结果
 - 用 DeepSeek black-box eval 验证改写前后
 - 根据结果调规则权重
+- 形成第一版 DeepSeek 行为 benchmark
 
-### V0.3：把它做成更好用的产品
+### V0.3：把 DeepSeek Lab 做成可复现实验
 
-- VS Code / Cursor 插件
-- Prompt 文件右键诊断
-- 报告一键导出
+- 保存 / 加载 DeepSeek axis vectors
+- 记录模型、层号、tokenizer、prompt pair 和设备信息
+- 对比不同层的 reasoning / self-verification 信号
+- 为未来 DeepSeek-family 模型迁移做基线
 
-### V0.4：把它做成社区项目
+### V0.4：跟踪未来 DeepSeek 模型变化
 
-- 用户自定义规则
-- 用户自定义目标状态
+- 比较新旧 DeepSeek 模型在 8 个行为轴上的变化
+- 记录哪些 prompt 模式继续有效，哪些失效
+- 输出 DeepSeek 模型迁移报告
 - 社区贡献 prompt 病例库
 
 ## 项目的边界
@@ -167,12 +170,14 @@ StateProbe 不是：
 - 万能 prompt 生成器
 - 绝对准确的心理测量仪
 - 可以替代人工判断的评分系统
+- 声称一个向量能解释所有 DeepSeek 模型的工具
 
 StateProbe 是：
 
 - 写 prompt 前的体检工具
 - 发现隐形风险的调试器
 - 让 prompt 改写变得可解释的辅助工具
+- 为 DeepSeek 现在和未来模型积累行为证据的研究工具链
 
 ## 最后判断
 

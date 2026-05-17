@@ -1,6 +1,6 @@
 # StateProbe
 
-> **A debugger for prompts and LLM behavior.** StateProbe checks whether your prompt is likely to make an AI actually answer, or drift into rambling, sycophancy, role-play, or overthinking.
+> **A debugger for prompts and LLM behavior, DeepSeek-first.** StateProbe checks whether your prompt is likely to make a DeepSeek-style reasoning model actually answer, or drift into rambling, sycophancy, role-play, or overthinking.
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
@@ -14,6 +14,13 @@
 代码写错了有 debugger 告诉你哪行挂了。Prompt 写烂了，AI 可能看起来很聪明，但其实在发散、迎合、装专家，或者没有回答核心问题。
 
 StateProbe 填这个空白：它诊断 prompt 会把模型推向什么行为状态，并给出可解释的污染源和改写建议。
+
+它的路线是 **DeepSeek-first, not DeepSeek-only**：
+
+- 默认 `check` 模式不绑定任何模型，用来快速发现 prompt 对 DeepSeek / 其他 LLM 的行为压力。
+- `eval` 模式优先服务 DeepSeek API / DeepSeek Pro 类模型，用真实输出验证改写是否有效。
+- `lab` 模式深耕开源 DeepSeek-family 模型，研究 reasoning、self-verification、sycophancy、任务发散等行为方向。
+- 长期目标不是“读心”，而是为 DeepSeek 现在和未来模型建立一套可复现的行为调试、评测和研究工具链。
 
 输入 prompt → 在 **8 个行为轴**上诊断当前行为压力 → 对比目标状态 → 列出污染源（带机制解释和引用）→ 给出可复制的改写建议。
 
@@ -56,6 +63,7 @@ StateProbe 会指出它的风险：
 - [`docs/DEMO_WALKTHROUGH.md`](docs/DEMO_WALKTHROUGH.md)：可验收 demo
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)：架构和数据流
 - [`docs/EVIDENCE_MODEL.md`](docs/EVIDENCE_MODEL.md)：三层证据模型
+- [`docs/DEEPSEEK_ROADMAP.md`](docs/DEEPSEEK_ROADMAP.md)：DeepSeek-first 研究路线
 - [`docs/FAQ.md`](docs/FAQ.md)：常见质疑和边界
 - [`docs/QUALITY_BAR.md`](docs/QUALITY_BAR.md)：对标高质量开源项目的验收门槛
 - [`docs/OPEN_SOURCE_PLAN.md`](docs/OPEN_SOURCE_PLAN.md)：完整开源项目计划
@@ -76,14 +84,16 @@ StateProbe 有三层证据，不把所有判断都伪装成“真实读激活”
 | 模式 | 作用 | 是否需要 API | 当前状态 |
 |---|---|---:|---|
 | **Static Mode** | 用可解释规则快速诊断 prompt 行为压力 | 否 | 默认可用 |
-| **Black-box Eval** | 运行原 prompt / 改写 prompt，对比真实输出行为 | 是 | 可选可用 |
-| **DeepSeek Lab** | 在开源模型上读取 hidden states 并做 activation projection | 否，但需要本地模型 | 实验模式 |
+| **Black-box Eval** | 运行原 prompt / 改写 prompt，对比 DeepSeek API 或兼容模型的真实输出行为 | 是 | 可选可用 |
+| **DeepSeek Lab** | 在开源 DeepSeek-family 模型上读取 hidden states 并做 activation projection | 否，但需要本地模型 | 实验模式 |
 
 关键边界：
 
 - Static Mode 是快速、离线、可解释的 proxy，不声称读取闭源模型 hidden states。
 - Black-box Eval 用真实输出验证改写是否改变模型行为。
 - DeepSeek Lab 才是本地开源模型上的 hidden-state activation probe。
+
+DeepSeek 方向详见 [`docs/DEEPSEEK_ROADMAP.md`](docs/DEEPSEEK_ROADMAP.md)：它解释为什么项目优先围绕 DeepSeek 的 reasoning、self-verification、sycophancy、task width drift 和未来模型迁移做工具链。
 
 ---
 
@@ -137,7 +147,7 @@ StateProbe 有三层证据，不把所有判断都伪装成“真实读激活”
 ## 安装
 
 ```bash
-git clone https://github.com/yourname/stateprobe.git
+git clone https://github.com/Erye932/stateprobe.git
 cd stateprobe
 pip install -e .
 ```
@@ -201,7 +211,7 @@ python scripts/acceptance_check.py
 
 当前 CLI 默认是 **Static Mode**：基于 prompt 表层规则估计行为向量压力，适合所有模型。
 
-DeepSeek Lab 是实验模式：用 `DeepSeek-R1-Distill-Qwen-1.5B` 的 `hidden_states` 构造 contrastive activation vectors。
+DeepSeek Lab 是实验模式：默认用 `DeepSeek-R1-Distill-Qwen-1.5B` 的 `hidden_states` 构造 contrastive activation vectors。未来如果 DeepSeek 发布新的开源权重模型，或社区有可本地加载的 DeepSeek-family 模型，也应该沿用同一套 axis pair、layer metadata、projection report 和 benchmark 流程去比较行为迁移。
 
 ```bash
 stateprobe lab explain
@@ -230,7 +240,7 @@ score = cosine(user_prompt_hidden_state, axis_vector)
 
 注意：这才是开源模型上的真实 activation projection；闭源 API 拿不到 hidden states，只能做黑箱行为评测。
 
-### Black-box Eval：用 DeepSeek Pro / OpenAI 验证改写效果
+### Black-box Eval：用 DeepSeek API / DeepSeek Pro 类模型验证改写效果
 
 StateProbe 的诊断和改写有没有用？用 API 实测。
 
@@ -257,7 +267,7 @@ stateprobe eval run \
   --rewritten-file prompts/rewritten.txt
 ```
 
-需要设置 `DEEPSEEK_API_KEY` 环境变量，或通过 `--api-key` 传入。默认用 DeepSeek Chat API；也支持任何 OpenAI 兼容 API（`--base-url`）。
+需要设置 `DEEPSEEK_API_KEY` 环境变量，或通过 `--api-key` 传入。默认用 DeepSeek Chat API；如果未来 DeepSeek 新模型提供 OpenAI-compatible endpoint，可以直接通过 `--model` / `--base-url` 接入。也支持其他 OpenAI 兼容 API，但项目路线优先围绕 DeepSeek 行为调试沉淀案例、规则和 benchmark。
 
 ### Python API
 

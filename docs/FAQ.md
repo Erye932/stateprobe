@@ -22,6 +22,33 @@ The default `stateprobe check` command does not read hidden states. It runs a st
 
 Real activation probing requires an open-weight local model, optional lab dependencies, and model weights. The current default lab target is `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B`.
 
+## Is StateProbe only for DeepSeek-R1?
+
+No.
+
+StateProbe is **DeepSeek-first, not DeepSeek-only**.
+
+- `stateprobe check` is model-agnostic and offline.
+- `stateprobe eval run` is designed to work especially well with DeepSeek API and future DeepSeek-compatible endpoints, but it can use other OpenAI-compatible APIs.
+- `stateprobe lab` currently focuses on open-weight DeepSeek-family models because local hidden states are required for activation probing.
+
+The project direction is to build a DeepSeek behavior debugging and research toolbox that can track how prompts affect current and future DeepSeek models.
+
+## What does this contribute to DeepSeek research?
+
+StateProbe gives a practical structure for studying prompt-induced behavior:
+
+- reasoning budget control
+- self-verification
+- sycophancy and disagreement
+- task width drift
+- vague expert analysis
+- model migration across DeepSeek-family releases
+
+The goal is not to claim that one vector explains everything. The goal is to combine static diagnosis, black-box DeepSeek eval, and local activation probing where available.
+
+See [`docs/DEEPSEEK_ROADMAP.md`](DEEPSEEK_ROADMAP.md) for the DeepSeek-first roadmap.
+
 ## Does it work with closed-source models?
 
 Yes, but indirectly.
