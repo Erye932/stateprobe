@@ -233,14 +233,17 @@ TASK_WIDTH_RULES: List[Rule] = [
         axis=Axis.TASK_WIDTH,
         direction=-1,
         patterns=[
-            r"本周",
-            r"今天",
+            # Bare "今天"/"明天"/"this week" matches casual time mentions
+            # ("今天天气怎么样") and falsely narrows scope. Require an
+            # adjacent scope/deadline marker so we only fire when the user
+            # is actually constraining task width.
+            r"(本周|今天|明天|下周)(内|前|完成|做完|交付|搞定|处理|做到|就要)",
+            r"本周内",
+            r"今天内",
             r"下一步",
-            r"下周",
-            r"明天",
-            r"this week",
-            r"today",
-            r"next step",
+            r"\bnext step\b",
+            r"\bby (tomorrow|today|end of (day|week))\b",
+            r"\b(this week|today|tomorrow)\s*[:\-]?\s*(deadline|due|finish|done|complete)\b",
         ],
         weight=0.25,
         explanation_zh="时间范围明确 = 任务宽度自动收窄到该窗口内可行动的部分。",

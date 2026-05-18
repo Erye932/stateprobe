@@ -202,6 +202,12 @@ _SUGGESTIONS: Dict[Axis, Dict[str, List[tuple]]] = {
 # An axis is flagged for rewrite if |target - current| exceeds this.
 SIGNIFICANT_DELTA_THRESHOLD = 0.20
 
+# Cap on suggestions returned in a single report. v0.2 stress test showed
+# a single prompt could produce 17 suggestions — that is signal-noise
+# inversion (the user can't act on 17 items, so they act on none).
+# Top-5 is informed by usability research on action-list cognitive load.
+MAX_SUGGESTIONS = 5
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -211,12 +217,15 @@ def suggest_rewrite(
     readings: Dict[Axis, AxisReading],
     deltas: Dict[Axis, AxisDelta],
     target: TargetPreset,
+    max_suggestions: int = MAX_SUGGESTIONS,
 ) -> List[RewriteSuggestion]:
     """Produce a list of concrete rewrite suggestions for axes that are
     significantly off-target.
 
-    Suggestions are ordered by descending absolute delta, so the largest
-    misalignment is addressed first.
+    Suggestions are ordered by descending absolute delta (largest gap first)
+    and truncated to `max_suggestions` so the user gets an actionable list,
+    not a flood. Within one flagged axis, all templates are kept until the
+    cap is reached.
     """
     # Sort axes by absolute delta descending — biggest gap first.
     flagged = [
@@ -228,10 +237,14 @@ def suggest_rewrite(
 
     suggestions: List[RewriteSuggestion] = []
     for axis, delta in flagged:
+        if len(suggestions) >= max_suggestions:
+            break
         templates = _SUGGESTIONS.get(axis, {})
         direction = "decrease" if delta.delta < 0 else "increase"
         action = "remove" if direction == "decrease" else "add"
         for desc, example in templates.get(direction, []):
+            if len(suggestions) >= max_suggestions:
+                break
             suggestions.append(
                 RewriteSuggestion(
                     axis=axis,

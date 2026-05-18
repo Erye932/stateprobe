@@ -39,6 +39,28 @@ def _get_api_key(api_key: Optional[str] = None) -> str:
     return key
 
 
+def _mask_secrets(text: str, resolved_key: str) -> str:
+    """Replace literal key occurrences and key-shaped tokens with ****.
+
+    Always masks the exact resolved key. Additionally masks any
+    `sk-...` / `Bearer ...` style sequences in case a provider returns
+    a transformed echo. Conservative: prefers leaking too much info over
+    leaking the secret.
+    """
+    if not text:
+        return text
+    out = text
+    if resolved_key and len(resolved_key) >= 8:
+        out = out.replace(resolved_key, "****")
+        # Also catch the last 6 chars (some providers truncate keys in logs).
+        out = out.replace(resolved_key[-6:], "****")
+    # Generic patterns: Bearer + base64-ish token, sk- prefix.
+    import re
+    out = re.sub(r"Bearer\s+[A-Za-z0-9_\-]{8,}", "Bearer ****", out)
+    out = re.sub(r"sk-[A-Za-z0-9_\-]{8,}", "sk-****", out)
+    return out
+
+
 def chat_completion(
     user_prompt: str,
     system_prompt: Optional[str] = None,
@@ -83,8 +105,12 @@ def chat_completion(
             body = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         error_body = exc.read().decode("utf-8", errors="replace") if exc.fp else ""
+        # Some providers echo the failing Authorization header back in their
+        # error body. Mask any key-shaped sequence before surfacing the
+        # message — never let the raw key leak into logs or tracebacks.
+        safe_body = _mask_secrets(error_body, resolved_key)
         raise RuntimeError(
-            f"API 请求失败 ({exc.code}): {error_body[:500]}"
+            f"API 请求失败 ({exc.code}): {safe_body[:500]}"
         ) from exc
 
     choice = body["choices"][0]

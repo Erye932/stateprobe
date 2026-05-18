@@ -86,19 +86,23 @@ StateProbe 会指出它的风险：
 
 ## How it works
 
-StateProbe 有三层证据，不把所有判断都伪装成“真实读激活”：
+v0.2 起 StateProbe 采用 **hybrid evidence 架构**（[ADR_009](docs/ADR_009_hybrid_engine.md)）：多个证据贡献者并行观察 prompt，各自发出带 confidence 的证据，统一聚合到 8 个轴的读数。不是二选一，是叠加。
 
-| 模式 | 作用 | 是否需要 API | 当前状态 |
+| 层 | 作用 | 是否需要 API | 当前状态 |
 |---|---|---:|---|
-| **Static Mode** | 用可解释规则快速诊断 prompt 行为压力 | 否 | 默认可用 |
-| **Black-box Eval** | 运行原 prompt / 改写 prompt，对比 DeepSeek API 或兼容模型的真实输出行为 | 是 | 可选可用 |
-| **DeepSeek Lab** | 在开源 DeepSeek-family 模型上读取 hidden states 并做 activation projection | 否，但需要本地模型 | 实验模式 |
+| **StaticRuleContributor** | 正则规则证据，毫秒响应，零成本，完全可解释（始终运行） | 否 | ✅ v0.1+ |
+| **LLMJudgeContributor** | LLM 语义证据，带 direction + strength + confidence + 引用片段（`--llm-augment` 开启） | 是 | ✅ v0.2 |
+| **EmbeddingContributor** | 本地嵌入模型离线兜底 | 否（需 ~120MB 模型） | 🔜 v0.3 |
+| **LabContributor** | 开源 DeepSeek 模型上读 hidden states / MoE expert routing | 否（需本地模型 + GPU） | 🔜 v0.4 |
+| **Black-box Eval**（独立工具） | 运行原 / 改写 prompt，对比真实模型输出 | 是 | ✅ 可选可用 |
 
 关键边界：
 
-- Static Mode 是快速、离线、可解释的 proxy，不声称读取闭源模型 hidden states。
-- Black-box Eval 用真实输出验证改写是否改变模型行为。
-- DeepSeek Lab 才是本地开源模型上的 hidden-state activation probe。
+- **Static 始终运行**：不论是否开 `--llm-augment`，正则规则始终贡献证据。不再是 `static OR llm`。
+- **LLM 是叠加层**：开 `--llm-augment` 时 LLM 证据合并进同一证据池，与 static 共同决定读数。API 不可用时静默丢掉 LLM 层，static 层照常输出。
+- **Confidence 决定权重**：每条证据带 `confidence`，聚合时按 `direction × weight × confidence` 加权，低置信度证据被过滤掉，避免 LLM "硬填 8 个轴"的幻觉。
+- **诊断 ≠ 读激活**：诊断是 prompt 文本特征分析，**不声称读取闭源模型 hidden states**。真正读模型内部激活是 v0.4 LabContributor 的事，只在开源 DeepSeek 模型上能做（OpenAI/Claude 物理上读不到）。
+- **Eval 评输出，诊断评输入**：Black-box Eval 评的是**输出**有没有变好，hybrid 诊断评的是**输入 prompt 本身**会激活什么。
 
 DeepSeek 方向详见 [`docs/DEEPSEEK_ROADMAP.md`](docs/DEEPSEEK_ROADMAP.md)：它解释为什么项目优先围绕 DeepSeek 的 reasoning、self-verification、sycophancy、task width drift 和未来模型迁移做工具链。
 
@@ -265,6 +269,31 @@ V4 baseline 差异：
 - **v4-pro**：推理预算 90%、自我验证 80%、任务宽度 75%（thinking mode 进一步强化）
 - **v4-flash**：推理预算 50%、自我验证 40%、果断性 55%（无 extended thinking）
 
+### Hybrid 模式：加 LLM 语义层（v0.2）
+
+正则规则抓不到的隐含行为压力，开 `--llm-augment` 让一个判断 LLM 在静态层之外补充语义证据。两层证据合并到同一池子聚合：
+
+```bash
+# 默认使用 DeepSeek Chat 作为判断模型
+stateprobe check --llm-augment "我希望你完全诚实地告诉我，不过尽量保持友好和鼓励"
+
+# 自定义判断模型 / endpoint
+stateprobe check --llm-augment \
+  --llm-model deepseek-chat \
+  --llm-base-url https://api.deepseek.com \
+  "你的 prompt"
+```
+
+需要 `DEEPSEEK_API_KEY` 环境变量（或通过 `--api-key` 传入）。如果 API 不可用，LLM 层会被静默丢掉，static 层依然产出报告——不会因为网络抖动让用户拿不到结果。
+
+何时该开 `--llm-augment`：
+- prompt 措辞礼貌但有隐含偏置（"请客观分析，但我希望你能多看到积极面"）
+- 多轮对话中累积的迎合压力，单条规则匹配不到
+- 项目自定义的领域语言，规则库尚未覆盖
+- 关键 prompt 在 production 上线前的最后一道审计
+
+> 旧标志 `--engine llm` 已弃用但仍可用（在 v0.3 前会移除），会触发一次性弃用提示。
+
 ### 结构警告（V4 CSA 压缩感知）
 
 StateProbe 自动检测以下结构问题（独立于 8 轴诊断）：
@@ -416,7 +445,7 @@ $ stateprobe check --file examples/bad_vague_expert.txt
 
 ## 路线图
 
-### V0.1 (当前 / MVP)
+### V0.1 (已发布 / MVP)
 - ✅ 8 个行为轴 + 5 个目标预设
 - ✅ 纯规则引擎，零 LLM 调用
 - ✅ CLI + 终端彩色输出
@@ -424,18 +453,30 @@ $ stateprobe check --file examples/bad_vague_expert.txt
 - ✅ DeepSeek Lab 脚手架（contrastive pairs + hidden-state probe 接口）
 - ✅ Black-box Eval（DeepSeek Pro / OpenAI API 输出对比评测）
 
-### V0.2
-- DeepSeek Lab 实跑验证：在 DeepSeek-R1-Distill-Qwen 上确认 projection 有区分度
-- **activation steering 验证**：对 hidden state 加/减行为向量，观察输出是否按预期偏移
-- LLM 辅助分类（规则不确定时调用 API 二次裁定）
+### V0.2 (本版本)
+- ✅ **Hybrid evidence pipeline** ([ADR_009](docs/ADR_009_hybrid_engine.md))：四层架构
+  - 结构警告 → Contributors 并行 → 唯一 Aggregator → Reasoner
+- ✅ **EvidenceContributor** 抽象：每层只发证据，聚合层唯一
+- ✅ **StaticRuleContributor**（v0.1+，始终运行，conf=1.0）
+- ✅ **LLMJudgeContributor**（`--llm-augment` 开启，emit direction+strength+confidence+quote）
+- ✅ Confidence 加权聚合：低置信度证据被过滤，trivial 检测正确
+- ✅ Top-N 改写建议（默认 5 条），避免建议爆炸
+- ✅ API 不可用时静默丢掉 LLM 层，static 层照常输出
 
-### V0.3
-- VS Code / Cursor 插件
+### V0.3 (1-2 个月)
+- **校准 benchmark**：50-100 个 prompt × 静态/LLM/嵌入三层对比，公开准确率
+- **EmbeddingContributor**：~120MB 多语言句子嵌入模型做离线兜底
+- VS Code / Cursor 插件 v0
 - 更细粒度的多语言支持（目前中英混合）
 
-### V0.4
-- 用户自定义轴和规则的 DSL
-- 规则库版本化与社区贡献流程
+### V0.4 (3-4 个月) — 真正护城河
+- **LabContributor**：在 DeepSeek-R1-Distill 开源权重上读 MoE expert routing
+- 同一 prompt 在 v3 / v4 上激活了不同 expert 的可视化 demo
+- 这是 OpenAI / Claude 闭源模型物理上做不到的事
+
+### V0.5 (4-6 个月)
+- 命名情绪向量库：用 contrastive prompts 抽出 10-20 个命名向量
+- Steering API：让 SaaS 工作流在 API 调用时叠加向量（控制不止于诊断）
 
 ---
 

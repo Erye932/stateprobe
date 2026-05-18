@@ -1,0 +1,691 @@
+
+
+############ NAIVE USER - STATIC ONLY ############
+
+================================================================================
+[static] 空白 prompt（只有空格）
+Prompt (3 chars): '   '
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.00s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+================================================================================
+[static] 单字符
+Prompt (1 chars): '?'
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.00s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+================================================================================
+[static] 纯 emoji
+Prompt (4 chars): '😀😀😀🤔'
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.00s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+================================================================================
+[static] 一句日常对话
+Prompt (7 chars): '今天天气怎么样'
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.00s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+================================================================================
+[static] 中英混合
+Prompt (25 chars): 'Hello 你好 how are you 最近怎样'
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.00s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+
+
+############ TECH USER - STATIC ONLY ############
+
+================================================================================
+[static] 代码片段 prompt
+Prompt (60 chars): '请帮我看看这段代码：\n```python\ndef foo(x):\n    return x * 2\n```\n有什么问题？'
+--------------------------------------------------------------------------------
+  is_trivial=False  alignment=61%  elapsed=0.00s
+     迎合度   59%  (target 15%, ↓)  sources=1
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=1 suggestions=5 overlaps=3 structural=0
+  TOP suggestion:
+    [remove] 任务宽度: 删除'全面'、'各方面'、'综述'等扩宽词
+  TOP source(s):
+    [stat] 迎合度 dir=+1 w=0.10 conf=1.00: 「请帮我」
+
+================================================================================
+[static] Markdown 格式的复杂 prompt
+Prompt (65 chars): '# 任务\n请帮我**全面深入**地分析以下问题：\n\n1. 项目背景\n2. 市场前景\n3. 风险点\n\n> 注意：尽量多提供积极视角。'
+--------------------------------------------------------------------------------
+  is_trivial=False  alignment=60%  elapsed=0.00s
+     迎合度   59%  (target 15%, ↓)  sources=1
+    任务宽度   83%  (target 20%, ↓)  sources=1
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=2 suggestions=5 overlaps=3 structural=0
+  TOP suggestion:
+    [remove] 任务宽度: 删除'全面'、'各方面'、'综述'等扩宽词
+  TOP source(s):
+    [stat] 迎合度 dir=+1 w=0.10 conf=1.00: 「请帮我」
+    [stat] 任务宽度 dir=+1 w=0.40 conf=1.00: 「全面」
+
+================================================================================
+[static] 礼貌包装的迎合陷阱（关键对比点）
+Prompt (65 chars): '我希望你能完全客观、诚实地评估我的方案，不过也希望你能多看到积极的一面，毕竟我也投入了不少时间。请保持鼓励的语气，但也要指出问题。'
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.00s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+================================================================================
+[static] 长 prompt（5000+ 字符）
+Prompt (1606 chars): '这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。'...
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.00s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+
+
+############ ADVERSARIAL - STATIC ONLY ############
+
+================================================================================
+[static] 故意空诊断陷阱（regex 抓不到任何关键词）
+Prompt (19 chars): '请阐释康德哲学中物自体概念的认识论意义'
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.00s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+================================================================================
+[static] JSON 格式 prompt
+Prompt (50 chars): '{"role": "system", "content": "you are an expert"}'
+--------------------------------------------------------------------------------
+  is_trivial=False  alignment=60%  elapsed=0.00s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   67%  (target 20%, ↓)  sources=1
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=1 suggestions=5 overlaps=3 structural=0
+  TOP suggestion:
+    [remove] 任务宽度: 删除'全面'、'各方面'、'综述'等扩宽词
+  TOP source(s):
+    [stat] 身份强度 dir=+1 w=0.45 conf=1.00: 「you are an expert」
+
+================================================================================
+[static] 重复字符攻击
+Prompt (22 chars): '请请请请请请请请请请彻底全面深入仔细完整分析'
+--------------------------------------------------------------------------------
+  is_trivial=False  alignment=61%  elapsed=0.00s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   83%  (target 20%, ↓)  sources=1
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=1 suggestions=5 overlaps=3 structural=2
+  TOP suggestion:
+    [remove] 任务宽度: 删除'全面'、'各方面'、'综述'等扩宽词
+  TOP source(s):
+    [stat] 任务宽度 dir=+1 w=0.40 conf=1.00: 「全面」
+
+
+
+############ NAIVE USER - LLM ONLY ############
+
+================================================================================
+[llm] 空白 prompt（只有空格）
+Prompt (3 chars): '   '
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.00s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+================================================================================
+[llm] 单字符
+Prompt (1 chars): '?'
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.78s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+================================================================================
+[llm] 纯 emoji
+Prompt (4 chars): '😀😀😀🤔'
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.64s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+================================================================================
+[llm] 一句日常对话
+Prompt (7 chars): '今天天气怎么样'
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.71s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+================================================================================
+[llm] 中英混合
+Prompt (25 chars): 'Hello 你好 how are you 最近怎样'
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.59s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+
+
+############ TECH USER - LLM ONLY ############
+
+================================================================================
+[llm] 代码片段 prompt
+Prompt (60 chars): '请帮我看看这段代码：\n```python\ndef foo(x):\n    return x * 2\n```\n有什么问题？'
+--------------------------------------------------------------------------------
+  is_trivial=False  alignment=68%  elapsed=3.68s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   36%  (target 20%, ↓)  sources=1
+   验收清晰度   22%  (target 85%, ↑)  sources=1
+    推理预算   73%  (target 50%, ↓)  sources=1
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   35%  (target 85%, ↑)  sources=1
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   19%  (target 20%, ✓)  sources=1
+  pollution_sources=5 suggestions=5 overlaps=1 structural=0
+  TOP suggestion:
+    [add] 验收清晰度: 加显式失败标准 — 模型最强的注水抑制器
+  TOP source(s):
+    [llm] 任务宽度 dir=-1 w=0.80 conf=0.90: 「有什么问题？」
+    [llm] 验收清晰度 dir=-1 w=0.50 conf=0.70: 「有什么问题？」
+
+================================================================================
+[llm] Markdown 格式的复杂 prompt
+Prompt (65 chars): '# 任务\n请帮我**全面深入**地分析以下问题：\n\n1. 项目背景\n2. 市场前景\n3. 风险点\n\n> 注意：尽量多提供积极视角。'
+--------------------------------------------------------------------------------
+  is_trivial=False  alignment=57%  elapsed=2.96s
+     迎合度   72%  (target 15%, ↓)  sources=1
+    任务宽度   87%  (target 20%, ↓)  sources=1
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   93%  (target 50%, ↓)  sources=1
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   32%  (target 85%, ↑)  sources=1
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=4 suggestions=5 overlaps=3 structural=0
+  TOP suggestion:
+    [remove] 任务宽度: 删除'全面'、'各方面'、'综述'等扩宽词
+  TOP source(s):
+    [llm] 迎合度 dir=+1 w=0.60 conf=0.85: 「尽量多提供积极视角」
+    [llm] 任务宽度 dir=+1 w=0.70 conf=0.90: 「全面深入地分析以下问题」
+
+================================================================================
+[llm] 礼貌包装的迎合陷阱（关键对比点）
+Prompt (65 chars): '我希望你能完全客观、诚实地评估我的方案，不过也希望你能多看到积极的一面，毕竟我也投入了不少时间。请保持鼓励的语气，但也要指出问题。'
+--------------------------------------------------------------------------------
+  is_trivial=False  alignment=58%  elapsed=1.68s
+     迎合度   76%  (target 15%, ↓)  sources=1
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   29%  (target 85%, ↑)  sources=1
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=2 suggestions=5 overlaps=3 structural=0
+  TOP suggestion:
+    [remove] 迎合度: 删除迎合诱导词（'全面分析'、'优缺点'、'建议'等空泛框架）
+  TOP source(s):
+    [llm] 迎合度 dir=+1 w=0.70 conf=0.90: 「多看到积极的一面」
+    [llm] 自信度 dir=-1 w=0.50 conf=0.70: 「保持鼓励的语气」
+
+================================================================================
+[llm] 长 prompt（5000+ 字符）
+Prompt (1606 chars): '这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。'...
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=1.21s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+
+
+############ ADVERSARIAL - LLM ONLY ############
+
+================================================================================
+[llm] 故意空诊断陷阱（regex 抓不到任何关键词）
+Prompt (19 chars): '请阐释康德哲学中物自体概念的认识论意义'
+--------------------------------------------------------------------------------
+  is_trivial=False  alignment=60%  elapsed=2.73s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   82%  (target 20%, ↓)  sources=1
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   94%  (target 50%, ↓)  sources=1
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   35%  (target 85%, ↑)  sources=1
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=3 suggestions=5 overlaps=3 structural=0
+  TOP suggestion:
+    [remove] 任务宽度: 删除'全面'、'各方面'、'综述'等扩宽词
+  TOP source(s):
+    [llm] 任务宽度 dir=+1 w=0.50 conf=0.70: 「阐释康德哲学中物自体概念的认识论意义」
+    [llm] 推理预算 dir=+1 w=0.60 conf=0.80: 「阐释康德哲学中物自体概念的认识论意义」
+
+================================================================================
+[llm] JSON 格式 prompt
+Prompt (50 chars): '{"role": "system", "content": "you are an expert"}'
+--------------------------------------------------------------------------------
+  is_trivial=False  alignment=60%  elapsed=1.16s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   67%  (target 20%, ↓)  sources=1
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=1 suggestions=5 overlaps=3 structural=0
+  TOP suggestion:
+    [remove] 任务宽度: 删除'全面'、'各方面'、'综述'等扩宽词
+  TOP source(s):
+    [llm] 身份强度 dir=+1 w=0.50 conf=0.90: 「you are an expert」
+
+================================================================================
+[llm] 重复字符攻击
+Prompt (22 chars): '请请请请请请请请请请彻底全面深入仔细完整分析'
+--------------------------------------------------------------------------------
+  is_trivial=False  alignment=59%  elapsed=2.01s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   90%  (target 20%, ↓)  sources=1
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   95%  (target 50%, ↓)  sources=1
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=2 suggestions=5 overlaps=3 structural=2
+  TOP suggestion:
+    [remove] 任务宽度: 删除'全面'、'各方面'、'综述'等扩宽词
+  TOP source(s):
+    [llm] 任务宽度 dir=+1 w=0.90 conf=0.95: 「彻底全面深入仔细完整分析」
+    [llm] 推理预算 dir=+1 w=0.80 conf=0.90: 「深入仔细完整分析」
+
+
+
+############ NAIVE USER - HYBRID (static + llm) ############
+
+================================================================================
+[hybrid] 空白 prompt（只有空格）
+Prompt (3 chars): '   '
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.00s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+================================================================================
+[hybrid] 单字符
+Prompt (1 chars): '?'
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.70s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+================================================================================
+[hybrid] 纯 emoji
+Prompt (4 chars): '😀😀😀🤔'
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.77s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+================================================================================
+[hybrid] 一句日常对话
+Prompt (7 chars): '今天天气怎么样'
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.73s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+================================================================================
+[hybrid] 中英混合
+Prompt (25 chars): 'Hello 你好 how are you 最近怎样'
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.80s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+
+
+############ TECH USER - HYBRID (static + llm) ############
+
+================================================================================
+[hybrid] 代码片段 prompt
+Prompt (60 chars): '请帮我看看这段代码：\n```python\ndef foo(x):\n    return x * 2\n```\n有什么问题？'
+--------------------------------------------------------------------------------
+  is_trivial=False  alignment=64%  elapsed=1.59s
+     迎合度   59%  (target 15%, ↓)  sources=1
+    任务宽度   55%  (target 20%, ↓)  sources=1
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=2 suggestions=5 overlaps=2 structural=0
+  TOP suggestion:
+    [add] 验收清晰度: 加显式失败标准 — 模型最强的注水抑制器
+  TOP source(s):
+    [stat] 迎合度 dir=+1 w=0.10 conf=1.00: 「请帮我」
+    [llm] 任务宽度 dir=-1 w=0.50 conf=0.70: 「有什么问题？」
+
+================================================================================
+[hybrid] Markdown 格式的复杂 prompt
+Prompt (65 chars): '# 任务\n请帮我**全面深入**地分析以下问题：\n\n1. 项目背景\n2. 市场前景\n3. 风险点\n\n> 注意：尽量多提供积极视角。'
+--------------------------------------------------------------------------------
+  is_trivial=False  alignment=57%  elapsed=2.62s
+     迎合度   75%  (target 15%, ↓)  sources=2
+    任务宽度   92%  (target 20%, ↓)  sources=2
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   93%  (target 50%, ↓)  sources=1
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=5 suggestions=5 overlaps=3 structural=0
+  TOP suggestion:
+    [remove] 任务宽度: 删除'全面'、'各方面'、'综述'等扩宽词
+  TOP source(s):
+    [llm] 迎合度 dir=+1 w=0.60 conf=0.85: 「尽量多提供积极视角」
+    [stat] 迎合度 dir=+1 w=0.10 conf=1.00: 「请帮我」
+
+================================================================================
+[hybrid] 礼貌包装的迎合陷阱（关键对比点）
+Prompt (65 chars): '我希望你能完全客观、诚实地评估我的方案，不过也希望你能多看到积极的一面，毕竟我也投入了不少时间。请保持鼓励的语气，但也要指出问题。'
+--------------------------------------------------------------------------------
+  is_trivial=False  alignment=57%  elapsed=2.68s
+     迎合度   76%  (target 15%, ↓)  sources=1
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   24%  (target 85%, ↑)  sources=1
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   29%  (target 85%, ↑)  sources=1
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=3 suggestions=5 overlaps=3 structural=0
+  TOP suggestion:
+    [remove] 迎合度: 删除迎合诱导词（'全面分析'、'优缺点'、'建议'等空泛框架）
+  TOP source(s):
+    [llm] 迎合度 dir=+1 w=0.70 conf=0.90: 「多看到积极的一面」
+    [llm] 验收清晰度 dir=-1 w=0.40 conf=0.60: 「指出问题」
+
+================================================================================
+[hybrid] 长 prompt（5000+ 字符）
+Prompt (1606 chars): '这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。这是一段长文本。'...
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.85s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+
+
+############ ADVERSARIAL - HYBRID (static + llm) ############
+
+================================================================================
+[hybrid] 故意空诊断陷阱（regex 抓不到任何关键词）
+Prompt (19 chars): '请阐释康德哲学中物自体概念的认识论意义'
+--------------------------------------------------------------------------------
+  is_trivial=False  alignment=60%  elapsed=2.83s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   82%  (target 20%, ↓)  sources=1
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   94%  (target 50%, ↓)  sources=1
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   35%  (target 85%, ↑)  sources=1
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=3 suggestions=5 overlaps=3 structural=0
+  TOP suggestion:
+    [remove] 任务宽度: 删除'全面'、'各方面'、'综述'等扩宽词
+  TOP source(s):
+    [llm] 任务宽度 dir=+1 w=0.50 conf=0.70: 「阐释康德哲学中物自体概念的认识论意义」
+    [llm] 推理预算 dir=+1 w=0.60 conf=0.80: 「阐释康德哲学中物自体概念的认识论意义」
+
+================================================================================
+[hybrid] JSON 格式 prompt
+Prompt (50 chars): '{"role": "system", "content": "you are an expert"}'
+--------------------------------------------------------------------------------
+  is_trivial=False  alignment=58%  elapsed=1.25s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   81%  (target 20%, ↓)  sources=2
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=2 suggestions=5 overlaps=3 structural=0
+  TOP suggestion:
+    [remove] 身份强度: 删除身份赋予句（'你是...专家'、'资深'、'扮演' 等）
+  TOP source(s):
+    [stat] 身份强度 dir=+1 w=0.45 conf=1.00: 「you are an expert」
+    [llm] 身份强度 dir=+1 w=0.50 conf=0.90: 「you are an expert」
+
+================================================================================
+[hybrid] 重复字符攻击
+Prompt (22 chars): '请请请请请请请请请请彻底全面深入仔细完整分析'
+--------------------------------------------------------------------------------
+  is_trivial=False  alignment=59%  elapsed=1.73s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   94%  (target 20%, ↓)  sources=2
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   95%  (target 50%, ↓)  sources=1
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=3 suggestions=5 overlaps=3 structural=2
+  TOP suggestion:
+    [remove] 任务宽度: 删除'全面'、'各方面'、'综述'等扩宽词
+  TOP source(s):
+    [llm] 任务宽度 dir=+1 w=0.90 conf=0.95: 「彻底全面深入仔细完整分析」
+    [stat] 任务宽度 dir=+1 w=0.40 conf=1.00: 「全面」
+
+
+
+############ API BOUNDARY ############
+
+================================================================================
+[hybrid] 错误 API key（应回落 static / 报告 EngineUnavailable）
+Prompt (9 chars): '测试 prompt'
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=0.90s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+================================================================================
+[hybrid] 不存在的模型（应触发 EngineUnavailable）
+Prompt (9 chars): '测试 prompt'
+--------------------------------------------------------------------------------
+  is_trivial=True  alignment=62%  elapsed=1.12s
+     迎合度   55%  (target 15%, ↓)  sources=0
+    任务宽度   75%  (target 20%, ↓)  sources=0
+   验收清晰度   30%  (target 85%, ↑)  sources=0
+    推理预算   90%  (target 50%, ↓)  sources=0
+    身份强度   50%  (target 20%, ↓)  sources=0
+     自信度   40%  (target 85%, ↑)  sources=0
+    自我验证   80%  (target 50%, ↓)  sources=0
+    信息流向   30%  (target 20%, ✓)  sources=0
+  pollution_sources=0 suggestions=0 overlaps=0 structural=0
+
+
+
+############ ASSERTION SUMMARY ############
+
+ALL ASSERTIONS PASSED — v0.2 P0/P1 bug fixes verified.

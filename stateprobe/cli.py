@@ -205,18 +205,22 @@ def render_terminal(report: Report) -> None:
         )
     console.print(table)
 
-    # Alignment score
-    align = report.alignment_score
-    align_text = Text()
-    align_text.append("对齐度: ", style="grey50")
-    align_text.append(f"{align * 100:.0f}%", style=_alignment_color(align))
-    if align >= 0.80:
-        align_text.append("  (已对齐，无需改写)", style="green")
-    elif align >= 0.55:
-        align_text.append("  (部分对齐，建议改写)", style="yellow")
-    else:
-        align_text.append("  (严重偏离，强烈建议改写)", style="red")
-    console.print(align_text)
+    # Alignment score — only meaningful when there's actual evidence from
+    # the prompt. On trivial prompts the deltas are pure baseline-vs-target,
+    # which says nothing about the user's prompt; showing a score would
+    # mislead. The trivial banner upstream already explains why.
+    if not report.is_trivial:
+        align = report.alignment_score
+        align_text = Text()
+        align_text.append("对齐度: ", style="grey50")
+        align_text.append(f"{align * 100:.0f}%", style=_alignment_color(align))
+        if align >= 0.80:
+            align_text.append("  (已对齐，无需改写)", style="green")
+        elif align >= 0.55:
+            align_text.append("  (部分对齐，建议改写)", style="yellow")
+        else:
+            align_text.append("  (严重偏离，强烈建议改写)", style="red")
+        console.print(align_text)
 
     # Pollution sources
     sources = report.pollution_sources
@@ -311,9 +315,12 @@ def render_terminal(report: Report) -> None:
     # Suggestions
     console.print()
     if not report.suggestions:
-        console.print(
-            Panel("✓ 已对齐目标坐标，无需改写。", title="改写建议", border_style="green")
-        )
+        if not report.is_trivial:
+            console.print(
+                Panel("✓ 已对齐目标坐标，无需改写。", title="改写建议", border_style="green")
+            )
+        # else: trivial banner upstream already told the user why there's
+        # nothing to suggest. Don't double-message.
     else:
         for i, sug in enumerate(report.suggestions, 1):
             action_style = "green" if sug.action == "add" else "red"
@@ -563,6 +570,44 @@ def ask(target_name: str, model_name: str) -> None:
     show_default=True,
     help="模型基线（元指令预设）。用于检测提示词与元指令的重叠。",
 )
+@click.option(
+    "--llm-augment",
+    "llm_augment",
+    is_flag=True,
+    default=False,
+    help="启用 LLM 语义层。在静态规则之外叠加 LLM-as-Judge 的证据"
+         "（v0.2 hybrid，需要 DEEPSEEK_API_KEY）。两层证据合并后再聚合。",
+)
+@click.option(
+    "--engine",
+    "engine_name",
+    type=click.Choice(["static", "llm"], case_sensitive=False),
+    default=None,
+    show_default=False,
+    hidden=True,
+    help="DEPRECATED：v0.2.0.dev0 旧参数。请改用 --llm-augment。"
+         "--engine llm 等价于 --llm-augment（且静态层不再被丢弃）。",
+)
+@click.option(
+    "--llm-model",
+    "llm_model",
+    default=DEFAULT_EVAL_MODEL,
+    show_default=True,
+    help="LLM 语义层使用的判断模型（仅 --llm-augment 时生效）。",
+)
+@click.option(
+    "--llm-base-url",
+    "llm_base_url",
+    default=DEFAULT_BASE_URL,
+    show_default=True,
+    help="LLM 语义层 API base URL（仅 --llm-augment 时生效）。",
+)
+@click.option(
+    "--api-key",
+    "api_key",
+    default=None,
+    help="LLM 语义层 API key。未提供时从 DEEPSEEK_API_KEY / OPENAI_API_KEY 环境变量读取。",
+)
 def check(
     prompt: Optional[str],
     file_path: Optional[str],
@@ -571,6 +616,11 @@ def check(
     auto_open: bool,
     no_terminal: bool,
     model_name: str,
+    llm_augment: bool,
+    engine_name: Optional[str],
+    llm_model: str,
+    llm_base_url: str,
+    api_key: Optional[str],
 ) -> None:
     """诊断一段 prompt 的状态向量。
 
@@ -581,9 +631,44 @@ def check(
       stateprobe check --file my_prompt.txt --target super_thinking_max --html report.html --open
 
       stateprobe check "think step by step" --model generic
+
+      stateprobe check --llm-augment "你的 prompt"   # v0.2 hybrid：静态 + LLM 双层证据
     """
+    from stateprobe.engines import LLMJudgeContributor
+
     text = _read_prompt(prompt, file_path)
-    report = diagnose(text, target_name=target_name, model_name=model_name)
+
+    # Backward-compat: `--engine llm` from v0.2.0.dev0 maps to --llm-augment.
+    # `--engine static` is the default and a no-op.
+    if engine_name and engine_name.lower() == "llm":
+        llm_augment = True
+        console.print(Panel(
+            Text.from_markup(
+                "[yellow]`--engine llm` 已弃用。请改用 [bold]--llm-augment[/bold]。[/yellow]\n"
+                "[dim]新行为：静态规则始终运行，LLM 仅作为额外证据层叠加。\n"
+                "旧行为（LLM 替换静态）会在 v0.3 移除。[/dim]"
+            ),
+            title="⚠ 弃用警告",
+            border_style="yellow",
+        ))
+
+    augment_contributor = None
+    if llm_augment:
+        augment_contributor = LLMJudgeContributor(
+            model=llm_model,
+            base_url=llm_base_url,
+            api_key=api_key,
+        )
+
+    # Note: EngineUnavailable from the LLM contributor is now caught silently
+    # inside detect_readings — static evidence still produces a result.
+    # No fallback panel needed because the user always gets output.
+    report = diagnose(
+        text,
+        target_name=target_name,
+        model_name=model_name,
+        llm_augment=augment_contributor,
+    )
 
     if not no_terminal:
         render_terminal(report)

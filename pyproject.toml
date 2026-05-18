@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stateprobe"
-version = "0.1.0"
+version = "0.2.0"
 description = "A debugger for prompts and LLM behavior."
 readme = "README.md"
 license = { text = "MIT" }

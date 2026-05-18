@@ -132,6 +132,18 @@ class Rule:
 class PollutionSource:
     """A specific span of the prompt that was matched by a rule and
     contributed to a non-neutral reading on some axis.
+
+    Per ADR_009 (hybrid evidence), this is the unified evidence type emitted
+    by every contributor (static rules, LLM judge, future embedding/lab).
+
+    `weight` and `confidence` are intentionally separate:
+    - `weight` = strength of signal when this evidence applies (0-1)
+    - `confidence` = how sure the contributor is this evidence applies (0-1)
+
+    Static rules are deterministic, so confidence defaults to 1.0 (the regex
+    either matched or it didn't). The LLM judge reports its own confidence;
+    low-confidence sources get filtered out by the aggregator before they
+    can pollute trivial prompts.
     """
 
     rule_id: str
@@ -141,6 +153,7 @@ class PollutionSource:
     matched_text: str  # the actual text span that matched
     explanation_zh: str
     citation: str
+    confidence: float = 1.0
 
 
 @dataclass

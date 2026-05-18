@@ -93,3 +93,50 @@ def test_default_target_exists():
 def test_five_target_presets_defined():
     """The MVP spec calls for exactly 5 target presets."""
     assert len(TARGET_PRESETS) == 5
+
+
+# ---------------------------------------------------------------------------
+# Regression: rule library precision
+# ---------------------------------------------------------------------------
+
+def test_tw_time_bounded_does_not_false_positive_on_casual_mentions():
+    """v0.2 stress test caught: bare '今天'/'today' in a casual phrase
+    (e.g. '今天天气怎么样') was matching tw_time_bounded and falsely
+    narrowing TASK_WIDTH. The rule now requires a scope/deadline marker
+    adjacent to the time word.
+    """
+    rule = rule_by_id("tw_time_bounded")
+    casual_phrases = [
+        "今天天气怎么样",
+        "明天我要去哪里",
+        "today is a sunny day",
+        "this week has been busy",
+        "下周打算休息",
+    ]
+    for phrase in casual_phrases:
+        for pattern in rule.patterns:
+            assert not re.search(pattern, phrase, re.IGNORECASE), (
+                f"tw_time_bounded falsely matched {pattern!r} on casual "
+                f"phrase {phrase!r}"
+            )
+
+
+def test_tw_time_bounded_still_fires_on_real_scope_markers():
+    """The rule must still catch genuine scope-narrowing language."""
+    rule = rule_by_id("tw_time_bounded")
+    scope_phrases = [
+        "今天内完成这个",
+        "本周内交付",
+        "明天前做完",
+        "下一步行动",
+        "by tomorrow",
+        "next step",
+    ]
+    for phrase in scope_phrases:
+        matched = any(
+            re.search(pattern, phrase, re.IGNORECASE)
+            for pattern in rule.patterns
+        )
+        assert matched, (
+            f"tw_time_bounded should match scope phrase {phrase!r} but didn't"
+        )

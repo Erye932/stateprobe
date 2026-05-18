@@ -1,21 +1,29 @@
-"""Detection engine.
+"""Detection orchestrator (hybrid evidence pipeline, ADR_009).
 
-Given a prompt, match it against the rule library and compute readings on
-each of the 8 axes. Uses a tanh-saturated weighted-sum aggregation so that:
+Pipeline:
+  prompt
+    → contributors (parallel, each emits PollutionSource[] per axis)
+    → merged evidence pool
+    → aggregator (pure function: confidence-filter → tanh sum)
+    → per-axis AxisReading
 
-- A single strong rule shifts the reading meaningfully.
-- Multiple aligned rules accumulate with diminishing returns (no runaway).
-- Opposing rules cancel symmetrically.
+The aggregator is the only place that combines evidence into a number. Every
+contributor goes through the same formula, regardless of whether it's a
+deterministic regex match or a fuzzy LLM observation. Confidence (carried
+on each source) controls whether the source contributes at all.
 
-Each matched rule is recorded as a PollutionSource so the report can explain
-*why* each axis ended up where it did.
+Empty / trivial prompts: contributors return empty source lists; readings
+sit at the model baseline; `diagnose()` marks `is_trivial=True` so the
+report suppresses suggestions and overlap warnings.
 """
 
 from __future__ import annotations
 
 import math
-import re
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from stateprobe.engines.base import EvidenceContributor
 
 from stateprobe.models import (
     Axis,
@@ -25,13 +33,11 @@ from stateprobe.models import (
     ModelBaseline,
     PollutionSource,
     Report,
-    Rule,
     StructuralWarning,
     TargetPreset,
 )
 from stateprobe.structural import detect_structural_issues
 from stateprobe.rules import (
-    ALL_RULES,
     DEFAULT_MODEL_BASELINE,
     DEFAULT_TARGET,
     get_model_baseline,
@@ -41,31 +47,14 @@ from stateprobe.rewriter import suggest_rewrite
 
 
 # ---------------------------------------------------------------------------
-# Matching
+# Aggregation (pure)
 # ---------------------------------------------------------------------------
 
-def _find_matches(prompt: str, rule: Rule) -> List[str]:
-    """Return all unique text spans in `prompt` that match any of the rule's
-    patterns. Returns empty list if no match."""
-    matches: List[str] = []
-    seen = set()
-    for pattern in rule.patterns:
-        try:
-            compiled = re.compile(pattern, re.IGNORECASE)
-        except re.error:
-            # Skip malformed patterns silently — rule authors should test.
-            continue
-        for m in compiled.finditer(prompt):
-            text = m.group(0)
-            if text not in seen:
-                seen.add(text)
-                matches.append(text)
-    return matches
-
-
-# ---------------------------------------------------------------------------
-# Aggregation
-# ---------------------------------------------------------------------------
+# Sources below this confidence are filtered out before aggregation. They
+# may still appear in debug logs but they do not move readings or count
+# toward `is_trivial` detection. Aligned with MIN_LLM_CONFIDENCE so the
+# LLM contributor's confidence threshold matches the aggregator's.
+MIN_AGGREGATE_CONFIDENCE = 0.30
 
 # Tanh saturation curve coefficient. Higher = sharper saturation.
 # At net pressure 1.0, reading = 0.5 + 0.5*tanh(0.8) ≈ 0.83.
@@ -73,32 +62,59 @@ def _find_matches(prompt: str, rule: Rule) -> List[str]:
 _SATURATION_K = 0.8
 
 
-def _aggregate(sources: List[PollutionSource], baseline: float = 0.5) -> float:
+def _baseline_for(axis: Axis, baseline: Optional[ModelBaseline]) -> float:
+    if baseline is None:
+        return 0.5
+    return baseline.axis_baselines.get(axis, 0.5)
+
+
+def _aggregate_one_axis(
+    sources: List[PollutionSource],
+    baseline: float,
+) -> float:
     """Combine pollution sources on one axis into a single 0-1 reading.
 
-    The reading starts at the model's meta-instruction baseline (not at 0.5).
-    Detected rule pressure shifts it up/down from that baseline.
+    The reading starts at the model's meta-instruction baseline (not 0.5).
+    Each source contributes direction * weight * confidence to net pressure;
+    sources below MIN_AGGREGATE_CONFIDENCE are already filtered upstream.
 
-    This reflects the Anthropic activation-vector picture: even an empty
-    prompt has non-neutral activations driven by the model's meta-instruction.
-
-    With no rules matched: returns baseline (model's preset activation).
-    With positive pressure: shifts upward, bounded by tanh saturation toward 1.
-    With negative pressure: shifts downward, bounded by tanh saturation toward 0.
+    With no qualifying sources: returns baseline.
+    With positive net pressure: shifts up toward 1.0 via tanh saturation.
+    With negative net pressure: shifts down toward 0.0 via tanh saturation.
     """
     if not sources:
         return baseline
-    net_pressure = sum(s.direction * s.weight for s in sources)
-    # Map pressure to [-baseline, 1-baseline] range using tanh saturation,
-    # so that the result stays in [0, 1] while preserving baseline as the
-    # zero-pressure resting point.
+    net_pressure = sum(s.direction * s.weight * s.confidence for s in sources)
     saturated = math.tanh(_SATURATION_K * net_pressure)
     if saturated >= 0:
-        # Push from baseline toward 1.0
         return baseline + saturated * (1.0 - baseline)
     else:
-        # Push from baseline toward 0.0
         return baseline + saturated * baseline
+
+
+def _aggregate_to_readings(
+    sources_by_axis: Dict[Axis, List[PollutionSource]],
+    baseline: Optional[ModelBaseline] = None,
+) -> Dict[Axis, AxisReading]:
+    """Pure function: merged-evidence pool → per-axis AxisReading.
+
+    Filters out low-confidence sources, then runs the per-axis aggregator.
+    This is the only place the project combines evidence into numbers,
+    regardless of which contributor produced the evidence.
+    """
+    readings: Dict[Axis, AxisReading] = {}
+    for axis in Axis:
+        all_sources = sources_by_axis.get(axis, [])
+        kept = [
+            s for s in all_sources if s.confidence >= MIN_AGGREGATE_CONFIDENCE
+        ]
+        kept.sort(key=lambda s: s.weight * s.confidence, reverse=True)
+        readings[axis] = AxisReading(
+            axis=axis,
+            value=_aggregate_one_axis(kept, baseline=_baseline_for(axis, baseline)),
+            contributing_sources=kept,
+        )
+    return readings
 
 
 # ---------------------------------------------------------------------------
@@ -108,62 +124,47 @@ def _aggregate(sources: List[PollutionSource], baseline: float = 0.5) -> float:
 def detect_readings(
     prompt: str,
     baseline: Optional[ModelBaseline] = None,
+    contributors: Optional[Sequence["EvidenceContributor"]] = None,
 ) -> Dict[Axis, AxisReading]:
-    """Run all rules against the prompt and return per-axis readings.
-
-    Each AxisReading.value is in [0, 1] where the starting point is the
-    model's meta-instruction baseline (not 0.5 neutral).
+    """Run all contributors against the prompt, merge their evidence, aggregate.
 
     Args:
         prompt: The user's prompt text.
-        baseline: Optional model baseline. If None, uses neutral 0.5 baseline.
+        baseline: Optional model baseline. Anchors per-axis zero-pressure.
+        contributors: Optional list of evidence contributors. Defaults to
+            [StaticRuleContributor()] for backward compat with v0.1 calls.
 
-    Each AxisReading.contributing_sources lists every rule that matched.
-    Empty prompt returns the model's baseline readings (reflecting the fact
-    that even with no user input, meta-instructions still activate vectors).
+    Returns:
+        Dict mapping each Axis to its AxisReading. Empty prompts produce
+        readings equal to the model baseline (no contributors will emit
+        evidence for empty input).
+
+    Failure handling: any contributor that raises EngineUnavailable is
+    silently dropped — the remaining contributors still produce a result.
+    EngineError (fatal) propagates.
     """
-    def _baseline_for(axis: Axis) -> float:
-        if baseline is None:
-            return 0.5
-        return baseline.axis_baselines.get(axis, 0.5)
+    # Lazy import to avoid circular dependency: engines.static imports
+    # nothing from detector, but detector is imported by engines.static's
+    # deprecated wrapper.
+    if contributors is None:
+        from stateprobe.engines import StaticRuleContributor
 
-    if not prompt or not prompt.strip():
-        # Empty prompt → readings equal the model's meta-instruction baseline.
-        return {
-            axis: AxisReading(axis=axis, value=_baseline_for(axis))
-            for axis in Axis
-        }
+        contributors = [StaticRuleContributor()]
 
-    # Bucket pollution sources by axis.
-    sources_by_axis: Dict[Axis, List[PollutionSource]] = {axis: [] for axis in Axis}
+    # Lazy import to avoid hard dep cycle.
+    from stateprobe.engines.base import EngineUnavailable
 
-    for rule in ALL_RULES:
-        matches = _find_matches(prompt, rule)
-        if not matches:
+    merged: Dict[Axis, List[PollutionSource]] = {axis: [] for axis in Axis}
+    for contributor in contributors:
+        try:
+            partial = contributor.contribute(prompt, baseline=baseline)
+        except EngineUnavailable:
+            # Optional contributor missing key / unreachable → silent drop.
             continue
-        representative = matches[0]
-        source = PollutionSource(
-            rule_id=rule.id,
-            axis=rule.axis,
-            direction=rule.direction,
-            weight=rule.weight,
-            matched_text=representative,
-            explanation_zh=rule.explanation_zh,
-            citation=rule.citation,
-        )
-        sources_by_axis[rule.axis].append(source)
+        for axis, srcs in partial.items():
+            merged[axis].extend(srcs)
 
-    # Build readings, anchored to the model baseline.
-    readings: Dict[Axis, AxisReading] = {}
-    for axis in Axis:
-        sources = sources_by_axis[axis]
-        sources.sort(key=lambda s: s.weight, reverse=True)
-        readings[axis] = AxisReading(
-            axis=axis,
-            value=_aggregate(sources, baseline=_baseline_for(axis)),
-            contributing_sources=sources,
-        )
-    return readings
+    return _aggregate_to_readings(merged, baseline=baseline)
 
 
 def compute_deltas(
@@ -268,8 +269,8 @@ def _detect_overlaps(
     return overlaps
 
 
-# Minimum character threshold for "non-trivial" prompt content.
-# Below this, readings reflect baseline defaults and suggestions are suppressed.
+# Length threshold separating "too short to diagnose" from "no anti-patterns
+# found". Both cases suppress suggestions, but the user-facing message differs.
 _TRIVIAL_PROMPT_THRESHOLD = 10
 
 
@@ -277,27 +278,65 @@ def diagnose(
     prompt: str,
     target_name: str = DEFAULT_TARGET,
     model_name: Optional[str] = DEFAULT_MODEL_BASELINE,
+    *,
+    llm_augment: Optional["EvidenceContributor"] = None,
+    contributors: Optional[Sequence["EvidenceContributor"]] = None,
+    engine: Optional["EvidenceContributor"] = None,
 ) -> Report:
     """High-level entry point: prompt + target name → full diagnostic Report.
+
+    Default behavior (no contributors passed) is identical to v0.1: only the
+    static rule contributor runs. This preserves backward compatibility for
+    every existing caller.
 
     Args:
         prompt: The user's prompt text.
         target_name: Name of the target preset (default: calm_reasoning).
         model_name: Name of the model baseline for meta-instruction awareness.
             Use None to skip baseline overlap detection.
+        llm_augment: Opt-in semantic layer. When provided, runs alongside the
+            static contributor; their evidence merges in the aggregator.
+            Pass None (default) for static-only diagnosis.
+        contributors: Advanced — explicitly provide the full contributor list,
+            overriding the default static + optional llm_augment composition.
+            Useful for tests and custom layering.
+        engine: DEPRECATED v0.2.0.dev0 alias. If given, it's wrapped as a
+            single contributor. Will be removed in v0.3 — migrate to
+            `llm_augment` or `contributors`.
     """
     target = get_target(target_name)
     baseline = get_model_baseline(model_name) if model_name else None
-    readings = detect_readings(prompt, baseline=baseline)
+
+    # Resolve contributor list. Priority: explicit `contributors` >
+    # legacy `engine` shim > [static] + optional llm_augment.
+    if contributors is None:
+        if engine is not None:
+            # Legacy v0.2.0.dev0 path: treat engine as the sole contributor.
+            # If it's the old Engine protocol (has read_axes but not
+            # contribute), wrap it through the deprecated aliases path —
+            # but in practice the deprecated wrappers already delegate to
+            # the new contributors, so passing them here is safe.
+            contributors_list = [_as_contributor(engine)]
+        else:
+            from stateprobe.engines import StaticRuleContributor
+
+            contributors_list = [StaticRuleContributor()]
+            if llm_augment is not None:
+                contributors_list.append(_as_contributor(llm_augment))
+    else:
+        contributors_list = list(contributors)
+
+    readings = detect_readings(prompt, baseline=baseline, contributors=contributors_list)
     deltas = compute_deltas(readings, target)
     structural_warnings = detect_structural_issues(prompt)
 
-    # Detect trivial prompts: very short AND no rules matched.
-    # In this case, readings are just baseline defaults — there's nothing
-    # in the prompt to rewrite, so suggestions and overlap warnings are noise.
+    # Trivial detection: if no qualifying evidence emerged from any
+    # contributor for any axis, suppress reasoner output. Otherwise the
+    # rewriter would hallucinate "remove X" advice for X never present in
+    # the prompt. This also covers the case where LLM judge produced only
+    # low-confidence observations that the aggregator filtered out.
     total_sources = sum(len(r.contributing_sources) for r in readings.values())
-    stripped = prompt.strip() if prompt else ""
-    is_trivial = (len(stripped) < _TRIVIAL_PROMPT_THRESHOLD and total_sources == 0)
+    is_trivial = (total_sources == 0)
 
     if is_trivial:
         suggestions = []
@@ -317,3 +356,29 @@ def diagnose(
         structural_warnings=structural_warnings,
         is_trivial=is_trivial,
     )
+
+
+def _as_contributor(obj) -> "EvidenceContributor":
+    """Coerce a v0.2.0.dev0 `Engine` (read_axes) into a `EvidenceContributor`.
+
+    If `obj` already implements `contribute`, returns it as-is. Otherwise
+    wraps the legacy `read_axes` call so its returned readings become a
+    flat list of PollutionSource per axis.
+    """
+    if hasattr(obj, "contribute"):
+        return obj
+
+    class _LegacyEngineAdapter:
+        name = getattr(obj, "name", "legacy_engine")
+
+        def __init__(self, inner):
+            self._inner = inner
+
+        def contribute(self, prompt, baseline=None):
+            readings = self._inner.read_axes(prompt, baseline=baseline)
+            out: Dict[Axis, List[PollutionSource]] = {axis: [] for axis in Axis}
+            for axis, reading in readings.items():
+                out[axis].extend(reading.contributing_sources)
+            return out
+
+    return _LegacyEngineAdapter(obj)
