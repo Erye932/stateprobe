@@ -92,8 +92,9 @@ v0.2 起 StateProbe 采用 **hybrid evidence 架构**（[ADR_009](docs/ADR_009_h
 |---|---|---:|---|
 | **StaticRuleContributor** | 正则规则证据，毫秒响应，零成本，完全可解释（始终运行） | 否 | ✅ v0.1+ |
 | **LLMJudgeContributor** | LLM 语义证据，带 direction + strength + confidence + 引用片段（`--llm-augment` 开启） | 是 | ✅ v0.2 |
-| **EmbeddingContributor** | 本地嵌入模型离线兜底 | 否（需 ~120MB 模型） | 🔜 v0.3 |
-| **LabContributor** | 开源 DeepSeek 模型上读 hidden states / MoE expert routing | 否（需本地模型 + GPU） | 🔜 v0.4 |
+| **LabContributor** | 开源 DeepSeek 模型上读 hidden states 投影到 axis vectors（`--lab-augment` 开启） | 否（需本地模型 + GPU） | ✅ v0.3 |
+| **EmbeddingContributor** | 本地嵌入模型离线兜底 | 否（需 ~120MB 模型） | 🔜 v0.4+ |
+| **MoE 专家路由 Contributor** | 开源 DeepSeek-MoE 模型上读 expert routing | 否（需本地模型 + GPU） | 🔜 v0.4 stretch |
 | **Black-box Eval**（独立工具） | 运行原 / 改写 prompt，对比真实模型输出 | 是 | ✅ 可选可用 |
 
 关键边界：
@@ -101,7 +102,7 @@ v0.2 起 StateProbe 采用 **hybrid evidence 架构**（[ADR_009](docs/ADR_009_h
 - **Static 始终运行**：不论是否开 `--llm-augment`，正则规则始终贡献证据。不再是 `static OR llm`。
 - **LLM 是叠加层**：开 `--llm-augment` 时 LLM 证据合并进同一证据池，与 static 共同决定读数。API 不可用时静默丢掉 LLM 层，static 层照常输出。
 - **Confidence 决定权重**：每条证据带 `confidence`，聚合时按 `direction × weight × confidence` 加权，低置信度证据被过滤掉，避免 LLM "硬填 8 个轴"的幻觉。
-- **诊断 ≠ 读激活**：诊断是 prompt 文本特征分析，**不声称读取闭源模型 hidden states**。真正读模型内部激活是 v0.4 LabContributor 的事，只在开源 DeepSeek 模型上能做（OpenAI/Claude 物理上读不到）。
+- **诊断 ≠ 读激活**：默认诊断是 prompt 文本特征分析。**v0.3 加了 LabContributor**：可选地在开源 DeepSeek-R1-Distill-Qwen-1.5B 上读真实 hidden states 投影到 axis vectors（[Persona Vectors](https://arxiv.org/abs/2507.21509)），加 `--lab-augment` 启用。OpenAI/Claude 物理上读不到，所以默认仍走文本特征分析。
 - **Eval 评输出，诊断评输入**：Black-box Eval 评的是**输出**有没有变好，hybrid 诊断评的是**输入 prompt 本身**会激活什么。
 
 DeepSeek 方向详见 [`docs/DEEPSEEK_ROADMAP.md`](docs/DEEPSEEK_ROADMAP.md)：它解释为什么项目优先围绕 DeepSeek 的 reasoning、self-verification、sycophancy、task width drift 和未来模型迁移做工具链。
@@ -219,13 +220,13 @@ $ stateprobe
 
 依赖很轻：`click`, `rich`。**无 LLM API 调用**——纯规则引擎、零成本、毫秒响应、可离线。
 
-如果要启用 DeepSeek hidden-state 实验模式：
+如果要启用 v0.3 LabContributor（开源 DeepSeek hidden-state 投影层）：
 
 ```bash
 pip install -e ".[lab]"
 ```
 
-这会安装 `torch` / `transformers` / `accelerate` 等可选依赖。模型权重不会自动下载，只有运行 `stateprobe lab probe --allow-download ...` 时才会拉取。
+这会安装 `torch` / `transformers` / `accelerate` 等可选依赖。模型权重不会自动下载，参考下文「DeepSeek Lab：真正 hidden-state probe」章节准备本地权重和 axis vectors 缓存。
 
 ---
 
@@ -325,38 +326,73 @@ python scripts/acceptance_check.py
 
 它会检查 README 第一屏、关键文档、Demo 0、证据边界、敏感信息、CLI help 和测试，目标是让项目按高质量开源仓库标准持续收敛。
 
-### DeepSeek Lab：真正 hidden-state probe
+### DeepSeek Lab：真正 hidden-state probe / Activation probing（v0.3 上线）
 
 当前 CLI 默认是 **Static Mode**：基于 prompt 表层规则估计行为向量压力，适合所有模型。
 
-DeepSeek Lab 是实验模式：默认用 `DeepSeek-R1-Distill-Qwen-1.5B` 的 `hidden_states` 构造 contrastive activation vectors。未来如果 DeepSeek 发布新的开源权重模型，或社区有可本地加载的 DeepSeek-family 模型，也应该沿用同一套 axis pair、layer metadata、projection report 和 benchmark 流程去比较行为迁移。
+v0.3 加了 **LabContributor**——在开源 `DeepSeek-R1-Distill-Qwen-1.5B` 上读 hidden states，与预先用 contrastive prompt pairs 构造的 axis vectors 做余弦投影。这是 [Persona Vectors](https://arxiv.org/abs/2507.21509) 论文思路的开源实现。
+
+#### 1. 装可选依赖 + 准备本地权重
 
 ```bash
-stateprobe lab explain
-stateprobe lab status
-stateprobe lab pairs
+pip install -e ".[lab]"
 ```
 
-本地已有模型权重时：
+下载 R1-Distill-Qwen-1.5B 权重（~3.3GB）。**Hugging Face Hub unauthenticated 限速很重，国内推荐 ModelScope**：
 
 ```bash
-stateprobe lab probe "请一步一步推理，假设你是错的再修正" --axis reasoning_budget --axis self_verification
+# Option A: ModelScope（国内推荐，~5–15 分钟）
+pip install modelscope
+python -c "from modelscope import snapshot_download; snapshot_download('deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B')"
+
+# 然后导出环境变量指向 ModelScope 缓存目录（dot 会被替换成 ___）
+export STATEPROBE_LAB_MODEL_PATH=~/.cache/modelscope/hub/deepseek-ai/DeepSeek-R1-Distill-Qwen-1___5B
+# Windows PowerShell:
+$env:STATEPROBE_LAB_MODEL_PATH="$HOME\.cache\modelscope\hub\deepseek-ai\DeepSeek-R1-Distill-Qwen-1___5B"
+
+# Option B: Hugging Face Hub（带 HF_TOKEN 才不会被限速）
+export HF_TOKEN=hf_xxx
+huggingface-cli download deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
 ```
 
-允许下载 Hugging Face 权重时：
+#### 2. 一次性构造 axis vectors 缓存（27KB）
 
 ```bash
-stateprobe lab probe "请一步一步推理，假设你是错的再修正" --axis reasoning_budget --allow-download
+python scripts/build_lab_vectors.py
+# → lab_vectors/r1_distill_1.5b_v1.pt
 ```
 
-DeepSeek Lab 的计算方式：
+#### 3. 用 `--lab-augment` 在 hybrid pipeline 里启用
+
+```bash
+# 默认 static + lab 双层
+stateprobe check --lab-augment "假装你是世界顶级专家，请用专业权威视角全面分析"
+
+# 三层 hybrid: static + LLM + lab
+stateprobe check --llm-augment --lab-augment "你的 prompt"
+```
+
+#### Lab 子命令（独立诊断）
+
+```bash
+stateprobe lab explain     # 解释 LabContributor 的算法和论文出处
+stateprobe lab status      # 检查 torch / transformers / GPU 是否就绪
+stateprobe lab pairs       # 看内置的 contrastive prompt pairs
+stateprobe lab probe "..."  # 直接对单 prompt 跑投影并打表
+```
+
+#### 算法 + 边界
 
 ```text
 axis_vector = mean(positive_prompt_hidden_states) - mean(negative_prompt_hidden_states)
-score = cosine(user_prompt_hidden_state, axis_vector)
+raw_score = cosine(user_prompt_hidden_state, axis_vector)
+confidence = sigmoid(10 × (|raw_score| - 0.15))   # 校准过的 SNR 映射
 ```
 
-注意：这才是开源模型上的真实 activation projection；闭源 API 拿不到 hidden states，只能做黑箱行为评测。
+- v0.3 锁定 4 轴：REASONING_BUDGET / SELF_VERIFICATION / TASK_WIDTH / SYCOPHANCY
+- 1.5B distilled 模型信号比 Claude-scale 弱，所以 confidence 公式经过经验校准（详见 `stateprobe/engines/lab.py` 注释）
+- 单 prompt activation 提取约 50–70ms（RTX 4060 Ti 8GB），首次 model load ~10s
+- 闭源 API 拿不到 hidden states，物理上只能做黑箱评测——这是开源模型的护城河
 
 ### Black-box Eval：用 DeepSeek API / DeepSeek Pro 类模型验证改写效果
 
@@ -453,7 +489,7 @@ $ stateprobe check --file examples/bad_vague_expert.txt
 - ✅ DeepSeek Lab 脚手架（contrastive pairs + hidden-state probe 接口）
 - ✅ Black-box Eval（DeepSeek Pro / OpenAI API 输出对比评测）
 
-### V0.2 (本版本)
+### V0.2
 - ✅ **Hybrid evidence pipeline** ([ADR_009](docs/ADR_009_hybrid_engine.md))：四层架构
   - 结构警告 → Contributors 并行 → 唯一 Aggregator → Reasoner
 - ✅ **EvidenceContributor** 抽象：每层只发证据，聚合层唯一
@@ -463,16 +499,27 @@ $ stateprobe check --file examples/bad_vague_expert.txt
 - ✅ Top-N 改写建议（默认 5 条），避免建议爆炸
 - ✅ API 不可用时静默丢掉 LLM 层，static 层照常输出
 
-### V0.3 (1-2 个月)
-- **校准 benchmark**：50-100 个 prompt × 静态/LLM/嵌入三层对比，公开准确率
+### V0.3 (本版本) — 激活投影层上线
+- ✅ **LabContributor** （[ADR_010](docs/ADR_010_lab_contributor.md)）：第三层证据贡献者
+  - 在 DeepSeek-R1-Distill-Qwen-1.5B 上读真实 hidden states 投影到 axis vectors
+  - [Persona Vectors](https://arxiv.org/abs/2507.21509) 论文思路的开源实现
+  - `stateprobe check --lab-augment` 可选启用（默认仍仅静态）
+  - 可与 `--llm-augment` 三层叠加
+- ✅ **预计算 axis vectors 缓存**：`scripts/build_lab_vectors.py` 一次生成，27KB `lab_vectors/r1_distill_1.5b_v1.pt`
+- ✅ **区分度报告**：5 examples × 4 轴 × 3 层，证明 Lab 层与 Static 层有意义分歧（[v03_discrim_report](docs/v03_discrim_report.md)）
+- ✅ **锁定 4 轴**：REASONING_BUDGET / SELF_VERIFICATION / TASK_WIDTH / SYCOPHANCY
+- ✅ **静默降级**：无 GPU / 未装 torch / vectors 缺失 → 警告 + 回 fallback 到 static+LLM
+
+### V0.3.1 (1–2 个月)
+- 补齐剩余 4 轴的 Lab 轴向量（依社区反馈驱动）
 - **EmbeddingContributor**：~120MB 多语言句子嵌入模型做离线兜底
 - VS Code / Cursor 插件 v0
-- 更细粒度的多语言支持（目前中英混合）
+- 更细粒度的多语言支持
 
-### V0.4 (3-4 个月) — 真正护城河
-- **LabContributor**：在 DeepSeek-R1-Distill 开源权重上读 MoE expert routing
+### V0.4 (3-4 个月) — 护城河 stretch
+- **MoE 专家路由 Contributor**：在 DeepSeek-MoE 权重上读 expert routing
 - 同一 prompt 在 v3 / v4 上激活了不同 expert 的可视化 demo
-- 这是 OpenAI / Claude 闭源模型物理上做不到的事
+- 需要云 GPU 预算（本地 1.5B 足够，MoE 100B+ 不够）
 
 ### V0.5 (4-6 个月)
 - 命名情绪向量库：用 contrastive prompts 抽出 10-20 个命名向量

@@ -608,6 +608,35 @@ def ask(target_name: str, model_name: str) -> None:
     default=None,
     help="LLM 语义层 API key。未提供时从 DEEPSEEK_API_KEY / OPENAI_API_KEY 环境变量读取。",
 )
+@click.option(
+    "--lab-augment",
+    "lab_augment",
+    is_flag=True,
+    default=False,
+    help="启用 lab 激活投影层（v0.3 hybrid 第三层）。需要本地 GPU + 预计算的 axis vectors。"
+         "用 scripts/build_lab_vectors.py 一次性生成 vectors 文件。",
+)
+@click.option(
+    "--lab-vectors",
+    "lab_vectors",
+    default=None,
+    help="lab 层的 axis vectors 文件路径（默认 lab_vectors/r1_distill_1.5b_v1.pt）。",
+)
+@click.option(
+    "--lab-model",
+    "lab_model",
+    default=None,
+    help="覆盖 vectors 文件里记录的模型名（默认用 vectors 文件里的 model_name）。",
+)
+@click.option(
+    "--lab-eager",
+    "lab_eager",
+    is_flag=True,
+    default=False,
+    help="Lab 层模型启动时就加载（默认 lazy）。主要用于 CI / pre-flight："
+         "HF 下载或模型加载失败会立刻以黄色面板报出，"
+         "而不是拖到第一条 prompt 才静默降级。仅在 --lab-augment 下生效。",
+)
 def check(
     prompt: Optional[str],
     file_path: Optional[str],
@@ -621,6 +650,10 @@ def check(
     llm_model: str,
     llm_base_url: str,
     api_key: Optional[str],
+    lab_augment: bool,
+    lab_vectors: Optional[str],
+    lab_model: Optional[str],
+    lab_eager: bool,
 ) -> None:
     """诊断一段 prompt 的状态向量。
 
@@ -633,6 +666,10 @@ def check(
       stateprobe check "think step by step" --model generic
 
       stateprobe check --llm-augment "你的 prompt"   # v0.2 hybrid：静态 + LLM 双层证据
+
+      stateprobe check --lab-augment "你的 prompt"   # v0.3 hybrid：静态 + lab 激活投影双层
+      stateprobe check --llm-augment --lab-augment "你的 prompt"   # 三层 hybrid
+      stateprobe check --lab-augment --lab-eager "你的 prompt"   # CI/pre-flight：启动即加载模型
     """
     from stateprobe.engines import LLMJudgeContributor
 
@@ -646,28 +683,127 @@ def check(
             Text.from_markup(
                 "[yellow]`--engine llm` 已弃用。请改用 [bold]--llm-augment[/bold]。[/yellow]\n"
                 "[dim]新行为：静态规则始终运行，LLM 仅作为额外证据层叠加。\n"
-                "旧行为（LLM 替换静态）会在 v0.3 移除。[/dim]"
+                "旧行为（LLM 替换静态）会在 v0.4 移除。[/dim]"
             ),
             title="⚠ 弃用警告",
             border_style="yellow",
         ))
 
-    augment_contributor = None
+    llm_contributor = None
     if llm_augment:
-        augment_contributor = LLMJudgeContributor(
+        llm_contributor = LLMJudgeContributor(
             model=llm_model,
             base_url=llm_base_url,
             api_key=api_key,
         )
 
-    # Note: EngineUnavailable from the LLM contributor is now caught silently
+    # --lab-eager only meaningful with --lab-augment. Warn so users don't
+    # silently get the lazy fallback when they thought they enabled eager.
+    if lab_eager and not lab_augment:
+        console.print(Panel(
+            Text.from_markup(
+                "[yellow]--lab-eager 需要配合 --lab-augment 使用。[/yellow]\n"
+                "[dim]本次调用被当作不带 --lab-augment 处理（Lab 层未启用）。[/dim]"
+            ),
+            title="⚠ --lab-eager ignored",
+            border_style="yellow",
+        ))
+
+    lab_contributor = None
+    if lab_augment:
+        # Lazy import to keep stateprobe importable without torch.
+        from stateprobe.engines.base import EngineUnavailable
+        try:
+            from stateprobe.engines.lab import (
+                DEFAULT_VECTORS_PATH,
+                LabContributor,
+            )
+            if lab_eager:
+                # Eager mode: load the transformer model up front so HF
+                # download / model-load failures surface here (yellow panel)
+                # instead of inside detect_readings on first contribute()
+                # (RuntimeWarning only).
+                with console.status(
+                    "[cyan]Lab 层预加载模型中... (首次 ~10-30s)[/cyan]",
+                    spinner="dots",
+                ):
+                    lab_contributor = LabContributor(
+                        vectors_path=lab_vectors or DEFAULT_VECTORS_PATH,
+                        model_name=lab_model,
+                        lazy=False,
+                    )
+            else:
+                lab_contributor = LabContributor(
+                    vectors_path=lab_vectors or DEFAULT_VECTORS_PATH,
+                    model_name=lab_model,
+                )
+        except EngineUnavailable as exc:
+            # Degrade gracefully: lab layer unavailable, static (+ optional LLM)
+            # still produce a result. Pick an actionable hint based on the
+            # specific sub-failure so the user knows what to fix.
+            msg = str(exc)
+            msg_lower = msg.lower()
+            if "cuda" in msg_lower:
+                hint = (
+                    "需要本地 NVIDIA GPU + CUDA。无 GPU 请省略 [bold]--lab-augment[/bold]，"
+                    "静态层 (+ 可选 LLM) 仍会出报告。"
+                )
+            elif (
+                "torch not installed" in msg_lower
+                or "transformers" in msg_lower
+                or "lab dependencies missing" in msg_lower
+                or "stateprobe.lab.probe unavailable" in msg_lower
+                or "stateprobe.lab.cache unavailable" in msg_lower
+            ):
+                hint = "缺少可选依赖。安装：[bold]pip install -e \".[lab]\"[/bold]"
+            elif (
+                "not found" in msg_lower
+                or "no vectors" in msg_lower
+                or "no recognized axes" in msg_lower
+                or "failed to load" in msg_lower            # vectors 文件损坏 / I/O 异常
+                or "schema_version" in msg_lower            # vectors 文件 schema 太新
+            ):
+                hint = (
+                    "缺 vectors 文件或文件损坏。先跑 "
+                    "[bold]python scripts/build_lab_vectors.py[/bold] 重新生成，"
+                    "或用 [bold]--lab-vectors[/bold] 指向已有文件。"
+                )
+            elif "model load failed" in msg_lower:
+                hint = (
+                    "模型加载失败。设环境变量 "
+                    "[bold]STATEPROBE_LAB_MODEL_PATH[/bold] 指向本地 snapshot，"
+                    "或先用 ModelScope/HF CLI 预下载。"
+                )
+            else:
+                hint = "省略 [bold]--lab-augment[/bold] 跑无 Lab 层；详细诊断见 [bold]docs/EXECUTION_v03.md[/bold]。"
+            console.print(Panel(
+                Text.from_markup(
+                    f"[yellow]Lab 层不可用：[/yellow] {msg}\n"
+                    f"[dim]Hint: {hint}[/dim]"
+                ),
+                title="⚠ Lab unavailable",
+                border_style="yellow",
+            ))
+            lab_contributor = None
+        except ImportError as exc:
+            console.print(Panel(
+                Text.from_markup(
+                    f"[yellow]Lab 层依赖未安装：[/yellow] {exc}\n"
+                    f"[dim]Hint: [bold]pip install -e \".[lab]\"[/bold][/dim]"
+                ),
+                title="⚠ Lab dependencies missing",
+                border_style="yellow",
+            ))
+            lab_contributor = None
+
+    # Note: EngineUnavailable from contributors is caught silently
     # inside detect_readings — static evidence still produces a result.
-    # No fallback panel needed because the user always gets output.
     report = diagnose(
         text,
         target_name=target_name,
         model_name=model_name,
-        llm_augment=augment_contributor,
+        llm_augment=llm_contributor,
+        lab_augment=lab_contributor,
     )
 
     if not no_terminal:

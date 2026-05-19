@@ -54,3 +54,12 @@ drafts/
 
 # IDE private workflows
 .windsurf/
+
+# Transient operational logs (download + smoke + discrim outputs)
+.*.log
+.lab_*.log
+.hf_*.log
+.build_*.log
+.discrim_*.log
+.snapshot_*.log
+.modelscope_*.log

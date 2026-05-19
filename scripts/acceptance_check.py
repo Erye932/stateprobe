@@ -129,7 +129,19 @@ def check_readme(result: Result) -> None:
         result.check(phrase in text, f"README contains: {phrase}")
     first_screen = "\n".join(text.splitlines()[:80])
     result.check("actually answer" in first_screen or "没有回答核心问题" in first_screen, "README first screen states the core pain")
-    result.check("不声称读取闭源模型 hidden states" in text, "README states static mode boundary")
+    # Boundary statement: README must explicitly disclaim reading closed-source
+    # model internals. The wording evolved from v0.2 ("不声称读取闭源模型 hidden
+    # states") to v0.3 ("OpenAI/Claude 物理上读不到") to reflect that LabContributor
+    # now does read hidden states — but only on the open-source DeepSeek model.
+    boundary_phrases = [
+        "不声称读取闭源模型 hidden states",
+        "闭源 API 拿不到 hidden states",
+        "OpenAI/Claude 物理上读不到",
+    ]
+    result.check(
+        any(p in text for p in boundary_phrases),
+        "README states closed-source-internals boundary",
+    )
 
 
 def check_docs(result: Result) -> None:

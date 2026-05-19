@@ -6,7 +6,8 @@ Covers:
 - diagnose() default == static-only (backward-compat with v0.1).
 - diagnose(llm_augment=...) merges both contributors' evidence.
 - Trivial prompts correctly marked (no synthetic sources from low-conf LLM).
-- EngineUnavailable from llm_augment is silently dropped; static still runs.
+- EngineUnavailable from llm_augment is dropped (graceful degradation) and
+  emits a RuntimeWarning (v0.3+ visibility); static still runs.
 - Deprecated StaticEngine / LLMJudgeEngine aliases still produce readings.
 """
 
@@ -343,6 +344,36 @@ def test_diagnose_silent_fallback_when_llm_unavailable():
     static_sources = [s for s in report.pollution_sources
                       if not s.rule_id.startswith("llm:")]
     assert len(static_sources) > 0
+
+
+def test_diagnose_emits_warning_when_contributor_drops(recwarn):
+    """v0.3: silent drops must emit a RuntimeWarning so library callers see
+    them. The contributor is still dropped (graceful degradation contract)
+    but the warning makes the failure observable to programmatic callers,
+    closing the silent-drop UX gap the CLI also fixed via its yellow panel.
+    """
+    import warnings as _warnings
+
+    llm = LLMJudgeContributor(
+        chat_fn=_make_failing_chat(RuntimeError("api 5xx")),
+    )
+    with _warnings.catch_warnings(record=True) as caught:
+        _warnings.simplefilter("always")
+        report = diagnose(
+            "你是资深专家，请全面分析这个项目",
+            llm_augment=llm,
+        )
+
+    # Report still produced (graceful degradation preserved).
+    assert not report.is_trivial
+    # Warning emitted naming the dropped contributor + reason.
+    runtime_warnings = [w for w in caught
+                        if issubclass(w.category, RuntimeWarning)]
+    assert any("llm_judge" in str(w.message) and "unavailable" in str(w.message)
+               for w in runtime_warnings), (
+        f"Expected RuntimeWarning naming the dropped contributor; got: "
+        f"{[str(w.message) for w in runtime_warnings]}"
+    )
 
 
 def test_diagnose_explicit_contributors_overrides_defaults():

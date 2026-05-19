@@ -20,6 +20,7 @@ report suppresses suggestions and overlap warnings.
 from __future__ import annotations
 
 import math
+import warnings
 from typing import Dict, List, Optional, Sequence, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -140,8 +141,9 @@ def detect_readings(
         evidence for empty input).
 
     Failure handling: any contributor that raises EngineUnavailable is
-    silently dropped — the remaining contributors still produce a result.
-    EngineError (fatal) propagates.
+    dropped (the remaining contributors still produce a result) and a
+    RuntimeWarning is emitted so library callers can observe the drop
+    without having to handle exceptions. EngineError (fatal) propagates.
     """
     # Lazy import to avoid circular dependency: engines.static imports
     # nothing from detector, but detector is imported by engines.static's
@@ -158,8 +160,18 @@ def detect_readings(
     for contributor in contributors:
         try:
             partial = contributor.contribute(prompt, baseline=baseline)
-        except EngineUnavailable:
-            # Optional contributor missing key / unreachable → silent drop.
+        except EngineUnavailable as exc:
+            # Optional contributor missing key / unreachable / runtime gone.
+            # We drop it (other contributors still produce a result) but emit
+            # a warning so callers can see what happened — the previous
+            # behaviour was a fully silent no-op, which made --lab-augment
+            # / --llm-augment failures invisible to library users.
+            warnings.warn(
+                f"Contributor {getattr(contributor, 'name', type(contributor).__name__)!r} "
+                f"unavailable; dropping its evidence: {exc}",
+                RuntimeWarning,
+                stacklevel=2,
+            )
             continue
         for axis, srcs in partial.items():
             merged[axis].extend(srcs)
@@ -280,6 +292,7 @@ def diagnose(
     model_name: Optional[str] = DEFAULT_MODEL_BASELINE,
     *,
     llm_augment: Optional["EvidenceContributor"] = None,
+    lab_augment: Optional["EvidenceContributor"] = None,
     contributors: Optional[Sequence["EvidenceContributor"]] = None,
     engine: Optional["EvidenceContributor"] = None,
 ) -> Report:
@@ -296,19 +309,21 @@ def diagnose(
             Use None to skip baseline overlap detection.
         llm_augment: Opt-in semantic layer. When provided, runs alongside the
             static contributor; their evidence merges in the aggregator.
-            Pass None (default) for static-only diagnosis.
+        lab_augment: Opt-in activation projection layer (v0.3+). When provided,
+            runs alongside static and optional LLM layer; evidence merges in
+            the same aggregator. See ADR_010.
         contributors: Advanced — explicitly provide the full contributor list,
-            overriding the default static + optional llm_augment composition.
+            overriding the default static + optional augment composition.
             Useful for tests and custom layering.
         engine: DEPRECATED v0.2.0.dev0 alias. If given, it's wrapped as a
-            single contributor. Will be removed in v0.3 — migrate to
-            `llm_augment` or `contributors`.
+            single contributor. Will be removed in v0.4 — migrate to
+            `llm_augment` / `lab_augment` / `contributors`.
     """
     target = get_target(target_name)
     baseline = get_model_baseline(model_name) if model_name else None
 
     # Resolve contributor list. Priority: explicit `contributors` >
-    # legacy `engine` shim > [static] + optional llm_augment.
+    # legacy `engine` shim > [static] + optional llm_augment + optional lab_augment.
     if contributors is None:
         if engine is not None:
             # Legacy v0.2.0.dev0 path: treat engine as the sole contributor.
@@ -323,6 +338,8 @@ def diagnose(
             contributors_list = [StaticRuleContributor()]
             if llm_augment is not None:
                 contributors_list.append(_as_contributor(llm_augment))
+            if lab_augment is not None:
+                contributors_list.append(_as_contributor(lab_augment))
     else:
         contributors_list = list(contributors)
 

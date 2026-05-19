@@ -2,6 +2,106 @@
 
 All notable changes to StateProbe will be documented in this file.
 
+## 0.3.0 - Unreleased - Activation-projection contributor
+
+This release adds a **third evidence layer** to the v0.2 hybrid pipeline:
+hidden-state activation projection on DeepSeek-R1-Distill-Qwen-1.5B using
+**Persona Vectors** (Anthropic arXiv:2507.21509). See
+`docs/ADR_010_lab_contributor.md` for the architectural decision.
+
+### Added
+
+- **`LabContributor`** (`stateprobe.engines.lab`): the v0.3 evidence
+  contributor. Projects prompt activation onto pre-built axis direction
+  vectors and emits `PollutionSource` evidence. Per-source confidence is
+  a sigmoid-calibrated mapping of cosine-projection magnitude
+  (`sigmoid(10 × (|raw| - 0.15))`); sources with `|raw| < MIN_LAB_CONFIDENCE`
+  (0.10, ≈ 4× the random-vector noise floor at hidden_dim=1536) are dropped
+  before that mapping.
+- **`LabVectorStore`** (`stateprobe.lab.cache`): persistent serialization for
+  pre-computed axis vectors with schema versioning and round-trip integrity.
+- **`scripts/build_lab_vectors.py`**: one-shot CLI to build and cache
+  `lab_vectors/r1_distill_1.5b_v1.pt` from contrastive prompt pairs.
+- **`scripts/lab_smoke.py`**: end-to-end Day 1 smoke test (G0 + G1 gates).
+- **`scripts/discrim_table.py`**: 5-example × 4-axis × 3-layer (static / LLM /
+  lab) discrimination report (G3 hard gate).
+- **`stateprobe check --lab-augment`**: opt-in CLI flag enabling the lab
+  layer in hybrid mode. Composable with `--llm-augment` (3-layer hybrid).
+- **`stateprobe check --lab-vectors PATH`**: override the default
+  `lab_vectors/r1_distill_1.5b_v1.pt` path.
+- **`stateprobe check --lab-eager`**: opt-in CLI flag that loads the
+  transformer model at startup instead of lazily on the first prompt.
+  HF download / model-load failures surface as a yellow `⚠ Lab unavailable`
+  panel at construction time (with a model-load-specific hint pointing at
+  `STATEPROBE_LAB_MODEL_PATH` and HF mirrors), instead of leaking out as a
+  deferred `RuntimeWarning` inside `detect_readings` on the first
+  `contribute()`. Primary use cases: CI / pre-flight scripts that want
+  fail-fast semantics. Only effective when `--lab-augment` is also set;
+  passing `--lab-eager` alone shows an `⚠ --lab-eager ignored` warning.
+- **`STATEPROBE_LAB_MODEL_PATH`** env variable: override the HF model
+  identifier with a local directory (e.g., ModelScope-downloaded snapshot)
+  when HF Hub is rate-limited or unreachable.
+- **`tests/test_engines_lab.py`**: 18 unit tests covering protocol
+  conformance, missing-vector handling, projection direction, confidence
+  gating, multi-axis projection, lazy / eager model loading, eager
+  CUDA / torch / transformers checks (silent-drop visibility), and
+  `diagnose()` integration.
+
+### Changed
+
+- `diagnose()` signature now accepts `lab_augment=` keyword, parallel to
+  `llm_augment=`. Default behavior unchanged (static-only).
+- `stateprobe.engines.__init__` lazy-imports `LabContributor` so importing
+  `stateprobe` does not pull in torch / transformers for users without GPUs.
+- `stateprobe/lab/probe.py` upgraded to use `dtype=` (transformers 5.0+
+  parameter) with `torch_dtype=` fallback for transformers 4.x.
+- `detect_readings` now emits a `RuntimeWarning` (instead of fully silent
+  drop) when a contributor raises `EngineUnavailable`. Graceful degradation
+  is preserved — the report still renders — but library callers can now
+  observe drops without forcing exception handling.
+
+### Fixed
+
+- **Silent-drop UX gap**: `--lab-augment` no longer becomes an invisible
+  no-op when CUDA, torch, or transformers is unavailable. The cheap
+  environment check (`stateprobe.lab.probe.dependency_status()` +
+  `torch.cuda.is_available()`) now runs eagerly in
+  `LabContributor.__init__`, so the CLI's existing try/except surfaces a
+  yellow `⚠ Lab unavailable` panel at construction time instead of the
+  contributor failing lazily inside `detect_readings` on first
+  `contribute()`.
+- CLI Lab-unavailable hint is now context-aware (CUDA / missing dependency /
+  missing vectors / model-load failure) instead of always pointing at
+  `scripts/build_lab_vectors.py`.
+- `scripts/build_lab_vectors.py` now does pre-flight torch + CUDA checks
+  (matching `lab_smoke.py` style) and wraps `load_model_and_tokenizer` /
+  `build_axis_vector` in targeted `try/except` blocks, so HF/network/CUDA
+  failures produce actionable hints with distinct exit codes (2 missing
+  deps, 3 no CUDA, 4 model load failed, 5 vector build crashed, 6 empty
+  pair lists, 7 round-trip integrity failed) instead of raw stack traces.
+- Doc/code drift on `MIN_LAB_CONFIDENCE` resolved: the Day 4 calibration
+  outcome (0.10, with a sigmoid-mapped per-source confidence
+  `sigmoid(10·(|raw| - 0.15))`) is now consistently reflected across
+  `CHANGELOG.md`, `docs/TECHNICAL_v03.md` §3 / §6.4, `docs/ACCEPTANCE_v03.md`,
+  `docs/EXECUTION_v03.md`, and `scripts/diagnose_lab_projections.py`.
+
+### Documentation
+
+- `docs/ADR_010_lab_contributor.md` (Proposed): architectural decision record.
+- `docs/EXECUTION_v03.md`: day-by-day implementation playbook.
+- `docs/PROJECT_v03.md`: external-facing v0.3 release notes.
+- `docs/TECHNICAL_v03.md`: algorithm, interface, performance, and risk register.
+- `docs/ACCEPTANCE_v03.md`: 7 hard gates (G0-G6 required, G7 stretch).
+
+### Known limitations
+
+- v0.3 covers 4 of 8 axes (REASONING_BUDGET, SELF_VERIFICATION, TASK_WIDTH,
+  SYCOPHANCY). Remaining 4 axes deferred to v0.3.1, driven by community feedback.
+- R1-Distill-Qwen-1.5B is a **dense** Qwen distilled from R1, not MoE.
+  True MoE expert routing is the v0.4 stretch goal contingent on cloud GPU budget.
+- `--lab-augment` requires CUDA; CPU fallback is too slow to ship (single
+  forward pass ~10-20s vs ~200ms on GPU).
+
 ## 0.2.0 - 2026-05-18 - Hybrid evidence engine
 
 This release replaces the v0.2.0.dev0 either-or `--engine` model with a

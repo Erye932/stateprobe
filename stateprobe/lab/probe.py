@@ -84,6 +84,25 @@ def require_lab_dependencies() -> None:
         )
 
 
+def _resolve_model_path(model_name: str) -> str:
+    """Resolve the model identifier, honoring STATEPROBE_LAB_MODEL_PATH override.
+
+    Use cases:
+    - HF Hub access blocked / rate-limited → pre-download via ModelScope into
+      a local directory and set STATEPROBE_LAB_MODEL_PATH to that directory.
+    - Custom snapshots / fine-tunes → point to local fine-tuned weights.
+
+    The override takes effect only if the env var is set AND points to an
+    existing directory; otherwise the original `model_name` is returned and
+    transformers will resolve it through HF Hub as usual.
+    """
+    import os
+    override = os.environ.get("STATEPROBE_LAB_MODEL_PATH")
+    if override and os.path.isdir(override):
+        return override
+    return model_name
+
+
 def load_model_and_tokenizer(
     model_name: str = DEFAULT_DEEPSEEK_MODEL,
     device: Optional[str] = None,
@@ -96,17 +115,32 @@ def load_model_and_tokenizer(
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
+    # STATEPROBE_LAB_MODEL_PATH override (ModelScope-downloaded snapshot etc.)
+    resolved = _resolve_model_path(model_name)
+
     tokenizer = AutoTokenizer.from_pretrained(
-        model_name,
+        resolved,
         trust_remote_code=True,
         local_files_only=local_files_only,
     )
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        trust_remote_code=True,
-        torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-        local_files_only=local_files_only,
-    )
+    # `dtype=` replaces the deprecated `torch_dtype=` in transformers >= 5.0.
+    # Fall back to torch_dtype for transformers 4.x compatibility.
+    dtype = torch.float16 if device == "cuda" else torch.float32
+    try:
+        model = AutoModelForCausalLM.from_pretrained(
+            resolved,
+            trust_remote_code=True,
+            dtype=dtype,
+            local_files_only=local_files_only,
+        )
+    except TypeError:
+        # transformers < 5.0 uses torch_dtype.
+        model = AutoModelForCausalLM.from_pretrained(
+            resolved,
+            trust_remote_code=True,
+            torch_dtype=dtype,
+            local_files_only=local_files_only,
+        )
     model.to(device)
     model.eval()
     return model, tokenizer, device

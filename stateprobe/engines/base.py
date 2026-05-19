@@ -37,7 +37,8 @@ class EngineError(RuntimeError):
 class EngineUnavailable(EngineError):
     """Recoverable contributor failure (missing API key, model not loaded, etc.).
 
-    The hybrid detector catches this and silently drops the contributor.
+    The hybrid detector catches this, drops the contributor, and emits a
+    RuntimeWarning (v0.3+). Other contributors still produce a result.
     """
 
 
