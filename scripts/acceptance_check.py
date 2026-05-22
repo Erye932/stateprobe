@@ -102,14 +102,38 @@ def check_required_files(result: Result) -> None:
 
 
 def check_readme(result: Result) -> None:
-    text = read("README.md")
-    required_phrases = [
-        "A debugger for prompts and LLM behavior",
-        "30 秒 Demo",
-        "smart_but_not_answering",
+    """Validate the bilingual README pair.
+
+    The repo ships two top-level READMEs since the launch repackaging:
+    - `README.md` — English primary, high-star convention, A2 hero
+      ("The attention layer for LLM agents.")
+    - `README.zh-CN.md` — Chinese mirror with the full China-specific install
+      flow, PowerShell encoding fix, and richer narrative
+
+    Each file owns a different set of phrase checks. Shared structural
+    invariants (docs/* links, badges, contributor pointers) are validated
+    against the English primary; Chinese-specific narrative phrases (the
+    legacy `30 秒 demo` / `smart_but_not_answering` references, the
+    boundary statement in Chinese) are validated against the mirror.
+    """
+    en_text = read("README.md")
+    zh_text = read("README.zh-CN.md")
+
+    # English primary: hero + high-star structural invariants
+    en_required = [
+        # A2 hero locked at launch repackaging
+        "The attention layer for LLM agents.",
+        # Boundary statement (English + Chinese mixed callout in EN README)
+        "OpenAI/Claude 物理上读不到",
+        # Sibling link to mirror
+        "README.zh-CN.md",
+        # Architecture pillars
         "Static Mode",
         "Black-box Eval",
         "DeepSeek Lab",
+        # Demo path — EN README still links to the legacy demo by directory
+        "smart_but_not_answering",
+        # Doc links (must remain wired up after rewrite)
         "docs/PROJECT_PLAN.md",
         "docs/OPERATING_RULES.md",
         "docs/ARCHITECTURE.md",
@@ -125,22 +149,50 @@ def check_readme(result: Result) -> None:
         "CONTRIBUTING.md",
         "CHANGELOG.md",
     ]
-    for phrase in required_phrases:
-        result.check(phrase in text, f"README contains: {phrase}")
-    first_screen = "\n".join(text.splitlines()[:80])
-    result.check("actually answer" in first_screen or "没有回答核心问题" in first_screen, "README first screen states the core pain")
-    # Boundary statement: README must explicitly disclaim reading closed-source
-    # model internals. The wording evolved from v0.2 ("不声称读取闭源模型 hidden
-    # states") to v0.3 ("OpenAI/Claude 物理上读不到") to reflect that LabContributor
-    # now does read hidden states — but only on the open-source DeepSeek model.
-    boundary_phrases = [
-        "不声称读取闭源模型 hidden states",
-        "闭源 API 拿不到 hidden states",
+    for phrase in en_required:
+        result.check(phrase in en_text, f"README.md contains: {phrase}")
+
+    en_first_screen = "\n".join(en_text.splitlines()[:40])
+    result.check(
+        "agents drift" in en_first_screen
+        or "actually answer" in en_first_screen,
+        "README.md first screen states the core pain",
+    )
+    # Boundary in English README
+    en_boundary_phrases = [
+        "cannot expose hidden states",
         "OpenAI/Claude 物理上读不到",
+        "open-source models",
     ]
     result.check(
-        any(p in text for p in boundary_phrases),
-        "README states closed-source-internals boundary",
+        any(p in en_text for p in en_boundary_phrases),
+        "README.md states closed-source-internals boundary",
+    )
+
+    # Chinese mirror: comprehensive Chinese narrative + China install flow
+    zh_required = [
+        "LLM agent 的注意力控制层",
+        "30 秒 demo",
+        "PowerShell",
+        "DeepSeek-first, not DeepSeek-only",
+        # Doc links must also exist in zh-CN (China-first readers land here)
+        "docs/SKILL_ATTENTION_HUD.md",
+        "docs/MCP_SERVER.md",
+        "docs/PROJECT_PLAN.md",
+        "CHANGELOG.md",
+        "CONTRIBUTING.md",
+    ]
+    for phrase in zh_required:
+        result.check(phrase in zh_text, f"README.zh-CN.md contains: {phrase}")
+
+    zh_boundary_phrases = [
+        "闭源 API 拿不到 hidden states",
+        "闭源 API",
+        "Claude",
+    ]
+    result.check(
+        any(p in zh_text for p in zh_boundary_phrases),
+        "README.zh-CN.md states closed-source-internals boundary",
     )
 
 

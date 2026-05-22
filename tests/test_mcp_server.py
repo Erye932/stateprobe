@@ -70,8 +70,14 @@ def test_preview_attention_tool_returns_visual_boundary_contract():
         "B",
         "C",
     ]
-    assert preview["activation_decision"]["action"] == "ask_boundary_question"
+    # plan 漏了真正的 must（沉浸感）→ 高优先级 rewrite_planned_focus 先触发；
+    # 边界反问保留在 boundary_questions / next_steps 里。
+    assert preview["activation_decision"]["action"] == "rewrite_planned_focus"
     assert preview["activation_decision"]["should_stop"] is True
+    assert any(
+        "打游戏" in step
+        for step in preview["activation_decision"]["next_steps"]
+    )
 
 
 def test_preview_attention_tool_returns_context_contamination_risks():

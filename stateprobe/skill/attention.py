@@ -81,6 +81,7 @@ STOPWORDS = {
 
 # 句子分隔：中英标点 + 换行
 SENTENCE_SPLIT_RE = re.compile(r"[。！？!?;\n]+")
+CLAUSE_SPLIT_RE = re.compile(r"[，,、：:]+")
 
 CJK_RE = re.compile(r"[\u4e00-\u9fff]+")
 EN_WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]{2,}")
@@ -483,6 +484,10 @@ CONCRETE_ENTITY_MARKERS_ZH: Tuple[str, ...] = (
     "杯子", "瓶子", "包", "帽子", "眼镜", "耳机",
 )
 
+VISUAL_FORBIDDEN_MARKERS: Tuple[str, ...] = (
+    "游戏UI", "游戏 UI", "UI", "界面", "文字", "字幕", "水印",
+)
+
 # 英文动作词
 ACTION_VERBS_EN: Tuple[str, ...] = (
     "playing", "watching", "listening", "reading", "eating",
@@ -531,6 +536,18 @@ LITERALIZATION_PATTERNS_ZH: List[Tuple[str, str, str]] = [
 def _split_sentences(text: str) -> List[str]:
     parts = SENTENCE_SPLIT_RE.split(text)
     return [p.strip() for p in parts if p and p.strip()]
+
+
+def _split_requirement_units(text: str) -> List[str]:
+    units: List[str] = []
+    for sent in _split_sentences(text):
+        parts = [p.strip() for p in CLAUSE_SPLIT_RE.split(sent)]
+        parts = [p for p in parts if p]
+        if len(parts) <= 1:
+            units.append(sent)
+        else:
+            units.extend(parts)
+    return units
 
 
 def _extract_keywords(sentence: str) -> List[str]:
@@ -600,7 +617,7 @@ def extract_requirements(context: str) -> List[Requirement]:
     - 用户在多个软要求里反复出现的同一关键词 → 自动提权（说明用户在反复强调）。
     """
     requirements: List[Requirement] = []
-    for sent in _split_sentences(context or ""):
+    for sent in _split_requirement_units(context or ""):
         marker, polarity = _detect_marker(sent)
         keywords = _extract_keywords(sent)
         if not keywords:
@@ -1213,13 +1230,41 @@ def _extract_boundary_candidates(sentence: str, polarity: str) -> List[str]:
         else:
             candidates.append(concept)
 
+    if polarity == "must_not":
+        for marker in VISUAL_FORBIDDEN_MARKERS:
+            if marker in sentence:
+                candidates.append(marker.replace(" ", ""))
+
     low = sentence.lower()
     for verb in ACTION_VERBS_EN:
         if verb in low:
             candidates.append(verb)
 
     if polarity == "must_not" and not candidates:
-        candidates.extend(_extract_keywords(sentence)[:3])
+        # 回退：从 n-gram 关键词里挑「不带功能字打头」且尽量长的几个，
+        # 避免渲染出 `不要把 / 要把格 / 把格式` 这类碎片。
+        # 这些字在中文里多半是助词 / 否定词 / 副词，不是用户真正想表达的对象。
+        skip_leading = ("不", "别", "勿", "要", "把", "让", "使", "给", "为",
+                        "在", "就", "都", "没", "也", "还", "再", "又",
+                        "当", "成", "做", "搞")
+        ngrams = _extract_keywords(sentence)
+        # 优先 3-gram，再补 2-gram；都跳过坏开头
+        cleaned = [
+            kw for kw in ngrams
+            if len(kw) >= 3 and not kw.startswith(skip_leading)
+        ]
+        if not cleaned:
+            cleaned = [
+                kw for kw in ngrams
+                if len(kw) >= 2 and not kw.startswith(skip_leading)
+            ]
+        if not cleaned:
+            # 实在没有就退回原 n-gram 前 1 个，保底（极少触发）
+            cleaned = ngrams[:1]
+        # 只取最干净的一个，避免滑窗 n-gram 把同一概念渲染三遍
+        # （如 `格式化 / 式化当 / 化当主`）。要表达多个 must_not
+        # 概念时，用户通常会分子句写，由 _split_requirement_units 兜住。
+        candidates.extend(cleaned[:1])
 
     seen: set = set()
     out: List[str] = []

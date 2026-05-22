@@ -376,6 +376,58 @@ def test_phase9_skill_overlay_missing_inputs_errors_clearly():
     assert "缺少用户上下文" in result.output or "缺少 agent 输出" in result.output
 
 
+def test_phase9_skill_overlay_rejects_whitespace_only_text():
+    # strip 后为空白也要按缺失处理，不能渲染空 HUD
+    result_ctx = CliRunner().invoke(
+        main,
+        ["skill", "overlay", "--context-text", "   ", "--output-text", "ok"],
+    )
+    assert result_ctx.exit_code != 0
+    assert "缺少用户上下文" in result_ctx.output
+
+    result_out = CliRunner().invoke(
+        main,
+        ["skill", "overlay", "--context-text", "ok", "--output-text", "\t\n "],
+    )
+    assert result_out.exit_code != 0
+    assert "缺少 agent 输出" in result_out.output
+
+
+def test_phase12_must_not_boundary_does_not_render_function_word_ngrams():
+    # README 推荐 demo 里这条 prompt 之前会渲染出 `不要把 / 要把格 / 把格式` 碎片
+    preview = preview_attention(
+        "核心是让 agent 的注意力可见。不要把格式化当主线。",
+        "我准备重点写 prompt 检查器和格式化模板。",
+    )
+    must_not = {
+        item["element"]
+        for item in preview.to_dict()["boundary_decomposition"]["must_not_show"]
+    }
+    bad_fragments = {"不要把", "要把格", "把格式", "不要", "要把", "把格"}
+    leaked = must_not & bad_fragments
+    assert not leaked, f"must_not_show leaked function-word ngrams: {leaked}"
+    # 至少要给出一个有意义的 3-gram；这里用 `格式化` 作为正面期望
+    assert any(len(item) >= 3 for item in must_not), (
+        f"must_not_show should contain a readable 3-gram, got: {must_not}"
+    )
+
+
+def test_phase11_skill_preview_rejects_whitespace_only_text():
+    result_ctx = CliRunner().invoke(
+        main,
+        ["skill", "preview", "--context-text", "   ", "--plan-text", "ok"],
+    )
+    assert result_ctx.exit_code != 0
+    assert "缺少用户上下文" in result_ctx.output
+
+    result_plan = CliRunner().invoke(
+        main,
+        ["skill", "preview", "--context-text", "ok", "--plan-text", "\t\n "],
+    )
+    assert result_plan.exit_code != 0
+    assert "缺少 planned focus" in result_plan.output
+
+
 def test_phase7_skill_overlay_cli_json_carries_phase7_fields(tmp_path):
     context = tmp_path / "context.txt"
     output = tmp_path / "output.txt"
@@ -512,9 +564,35 @@ def test_phase12_preview_decomposes_visual_boundaries_and_literalization():
         "A", "B", "C"
     ]
     assert any(option["recommended"] for option in question["options"])
-    assert payload["activation_decision"]["action"] == "ask_boundary_question"
+    # `重点是小男孩的沉浸感` 是真正的 must，plan 完全没覆盖 `沉浸感`，
+    # 因此优先级更高的 rewrite_planned_focus 应当先于 boundary_question 触发；
+    # 边界反问不会丢，仍在 boundary_questions / next_steps 里。
+    assert payload["activation_decision"]["action"] == "rewrite_planned_focus"
     assert payload["activation_decision"]["should_stop"] is True
-    assert "打游戏" in payload["activation_decision"]["message"]
+    assert any(
+        "打游戏" in step for step in payload["activation_decision"]["next_steps"]
+    )
+
+
+def test_phase12_preview_splits_mixed_positive_and_negative_clauses():
+    preview = preview_attention(
+        "小男孩拿着手机打游戏，重点是沉浸感，不要出现游戏UI。",
+        "我准备画小男孩拿手机，屏幕上显示游戏UI。",
+    )
+
+    boundary = preview.to_dict()["boundary_decomposition"]
+    must_show = {item["element"] for item in boundary["must_show"]}
+    can_imply = {item["element"] for item in boundary["can_imply"]}
+    must_not_show = {item["element"] for item in boundary["must_not_show"]}
+
+    assert "小男孩" in must_show
+    assert "手机" in must_show
+    assert "沉浸感" in can_imply
+    assert "打游戏" in can_imply
+    assert "游戏UI" in must_not_show
+    assert "小男孩" not in must_not_show
+    assert "手机" not in must_not_show
+    assert "沉浸感" not in must_not_show
 
 
 def test_phase12_skill_preview_cli_json_includes_boundary_fields():

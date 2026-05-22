@@ -119,6 +119,46 @@ hidden-state activation projection on DeepSeek-R1-Distill-Qwen-1.5B using
   `sigmoid(10·(|raw| - 0.15))`) is now consistently reflected across
   `CHANGELOG.md`, `docs/TECHNICAL_v03.md` §3 / §6.4, `docs/ACCEPTANCE_v03.md`,
   `docs/EXECUTION_v03.md`, and `scripts/diagnose_lab_projections.py`.
+- **Skill — mixed positive/negative clauses**: `重点是 X，不要 Y` 形式的句子
+  之前会被整体识别为单一 `must_not`，导致 `小男孩 / 手机 / 沉浸感` 这类
+  应当是 `must_show / can_imply` 的元素被错误归类到 `must_not_show`。
+  现在 `extract_requirements` 走 `_split_requirement_units`，按
+  逗号 / 顿号 / 冒号把句子拆成多个要求单元分别识别 polarity。
+- **Skill — `must_not_show` 输出可读性**：之前对 `不要把 X 当 Y` / `不要 X UI`
+  这类句子会回退到 n-gram 切片，渲染出 `不要把 / 要把格 / 把格式` 这种
+  功能词碎片。现在引入 `VISUAL_FORBIDDEN_MARKERS`（`游戏UI / UI / 界面 /
+  文字 / 字幕 / 水印`）直接命中视觉禁项，文本回退过滤掉以否定 / 助词 /
+  副词字符开头的 n-gram，并仅取最干净的一个 3-gram，避免同概念的滑窗
+  偏移噪音。
+- **CLI — Skill 入口空白输入**：`stateprobe skill preview/overlay` 接受
+  `--context-text "   "`（纯空白）时之前会渲染出空 HUD。现在 strip 后
+  为空就走和缺失参数同样的清晰中文 UsageError，覆盖文本路径和
+  `--stdin-json` 路径。
+- **打包 — `python -m stateprobe` 入口**：之前缺 `__main__.py`，
+  `python -m stateprobe` 直接报 `'stateprobe' is a package and cannot be
+  directly executed`。现在新增 `stateprobe/__main__.py` 转发到
+  `stateprobe.cli:main`，与 `[project.scripts] stateprobe` 入口等价。
+
+### Launch repackaging
+
+- **README rewritten in high-star convention**: hero 锁定为
+  「**The attention layer for LLM agents.**」（A2 候选，对标
+  `langchain-ai/langchain` / `Aider-AI/aider` / `ollama/ollama` /
+  `continuedev/continue` 的 hero 句式）。第一屏直接给安装一行 + 30 秒
+  demo + `activation_decision` 决策表，路人 5 秒内能下决定要不要 ⭐。
+- **Bilingual READMEs**: 拆成英文 primary `README.md`（高星款，~165 行）+
+  中文镜像 `README.zh-CN.md`（含 China SSH-over-443 镜像、PowerShell
+  编码 fix、`stateprobe demo` 完整命令样例）。两个文件互相 link。
+  英文 README 走全球流量、工程感和品类抢占；中文 README 给国内读者
+  完整安装路径，并保留「自向定位 / 模型罗盘 / 每次问题的权重切片」
+  这条产品 vision 段落作为 v0.4+ 的延展叙事。
+- **`pyproject.toml` description**: 同步为
+  「The attention layer for LLM agents — see what the model fires before
+  it ships.」与 PyPI 卡片对齐 hero。
+- **`scripts/acceptance_check.py` `check_readme`** 重构为双文件分别
+  校验：英文 README 校验 hero / 高星结构 / docs 链接 / boundary
+  声明；中文 README 校验中文 hero、PowerShell snippet、China-specific
+  路径、闭源 API boundary。
 
 ### Documentation
 

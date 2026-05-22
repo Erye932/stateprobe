@@ -1598,7 +1598,12 @@ def _resolve_skill_inputs(
             raise click.UsageError(
                 "--stdin-json 需要 context 和 output 两个字符串字段。"
             )
-        return ctx.strip(), out.strip()
+        ctx, out = ctx.strip(), out.strip()
+        if not ctx or not out:
+            raise click.UsageError(
+                "--stdin-json 的 context 和 output 不能为空字符串或全空白。"
+            )
+        return ctx, out
 
     if context_path and context_text:
         raise click.UsageError(
@@ -1614,9 +1619,11 @@ def _resolve_skill_inputs(
     elif context_path:
         user_context = Path(context_path).read_text(encoding="utf-8").strip()
     else:
+        user_context = ""
+    if not user_context:
         raise click.UsageError(
             "缺少用户上下文：请提供 --context PATH 或 --context-text TEXT "
-            "或 --stdin-json。"
+            "或 --stdin-json（不能为空字符串或全空白）。"
         )
 
     if agent_output_text is not None:
@@ -1626,9 +1633,11 @@ def _resolve_skill_inputs(
             Path(agent_output_path).read_text(encoding="utf-8").strip()
         )
     else:
+        agent_output = ""
+    if not agent_output:
         raise click.UsageError(
             "缺少 agent 输出：请提供 --output PATH 或 --output-text TEXT "
-            "或 --stdin-json。"
+            "或 --stdin-json（不能为空字符串或全空白）。"
         )
 
     return user_context, agent_output
@@ -1665,7 +1674,12 @@ def _resolve_skill_preview_inputs(
             raise click.UsageError(
                 "--stdin-json 需要 context 和 plan 两个字符串字段。"
             )
-        return ctx.strip(), plan.strip()
+        ctx, plan = ctx.strip(), plan.strip()
+        if not ctx or not plan:
+            raise click.UsageError(
+                "--stdin-json 的 context 和 plan 不能为空字符串或全空白。"
+            )
+        return ctx, plan
 
     if context_path and context_text:
         raise click.UsageError(
@@ -1679,9 +1693,11 @@ def _resolve_skill_preview_inputs(
     elif context_path:
         user_context = Path(context_path).read_text(encoding="utf-8").strip()
     else:
+        user_context = ""
+    if not user_context:
         raise click.UsageError(
             "缺少用户上下文：请提供 --context PATH 或 --context-text TEXT "
-            "或 --stdin-json。"
+            "或 --stdin-json（不能为空字符串或全空白）。"
         )
 
     if plan_text is not None:
@@ -1689,9 +1705,11 @@ def _resolve_skill_preview_inputs(
     elif plan_path:
         planned_focus = Path(plan_path).read_text(encoding="utf-8").strip()
     else:
+        planned_focus = ""
+    if not planned_focus:
         raise click.UsageError(
             "缺少 planned focus：请提供 --plan PATH 或 --plan-text TEXT "
-            "或 --stdin-json。"
+            "或 --stdin-json（不能为空字符串或全空白）。"
         )
 
     return user_context, planned_focus
