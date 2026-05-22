@@ -11,6 +11,16 @@ hidden-state activation projection on DeepSeek-R1-Distill-Qwen-1.5B using
 
 ### Added
 
+- **Skill — Agent Attention HUD** (`stateprobe skill preview` /
+  `stateprobe skill overlay`): external control layer for agent hosts. Preview
+  returns a machine-readable `activation_decision` so hosts can continue,
+  rewrite planned focus, ask a boundary question, or cut stale context before
+  output.
+- **MCP server** (`stateprobe-mcp`): exposes
+  `stateprobe_preview_attention` and `stateprobe_overlay_attention` for Claude
+  Code, Cursor, Cline, Continue, and other MCP-compatible hosts.
+- **Claude Code Skill package** (`skills/stateprobe/SKILL.md`): user-facing
+  activation and confirmation flow for the StateProbe Skill.
 - **`LabContributor`** (`stateprobe.engines.lab`): the v0.3 evidence
   contributor. Projects prompt activation onto pre-built axis direction
   vectors and emits `PollutionSource` evidence. Per-source confidence is
@@ -73,6 +83,31 @@ hidden-state activation projection on DeepSeek-R1-Distill-Qwen-1.5B using
 - CLI Lab-unavailable hint is now context-aware (CUDA / missing dependency /
   missing vectors / model-load failure) instead of always pointing at
   `scripts/build_lab_vectors.py`.
+- **`--llm-augment` UX parity with `--lab-augment`**: previously, missing
+  API key / 401 / network failure surfaced as a raw `RuntimeWarning` plus a
+  401 JSON dump on stderr — looked like a crash. Now LLM failures show the
+  same yellow `⚠ LLM unavailable` panel UX as Lab failures, via two paths
+  routing through a shared `_render_contributor_warning()` helper:
+  1. **Pre-flight API-key check** in CLI: if neither `--api-key` nor
+     `DEEPSEEK_API_KEY` / `OPENAI_API_KEY` is set, the panel renders before
+     `diagnose()` runs and the contributor is skipped (mirrors the Lab
+     eager-init pattern).
+  2. **`warnings.catch_warnings()` around `diagnose()`**: the
+     `RuntimeWarning` that `detect_readings()` emits on lazy contributor
+     drop (e.g., 401 on first `contribute()`) is captured and translated
+     into the same panel — instead of leaking to stderr.
+- CLI LLM-unavailable hint is context-aware: missing key /
+  401 / 403 / 404-model / 429 rate-limit / 5xx server / network /
+  timeout / malformed-JSON each route to a different actionable hint
+  (locked by 10-row parametrized regression in
+  `tests/test_cli.py::test_check_llm_hint_matcher_routes_each_failure_class_correctly`).
+- README PowerShell-encoding warning hoisted from the post-install section
+  to immediately before the 30-second demo, so first-time Windows /
+  PowerShell users see the one-line `[Console]::OutputEncoding` setup
+  before they hit the box-drawing-character garble. The two warnings
+  (pre-demo callout + post-install note) now agree on root cause
+  (PowerShell's .NET output layer can't be reconfigured from a Python
+  child process) and converge on the same fix.
 - `scripts/build_lab_vectors.py` now does pre-flight torch + CUDA checks
   (matching `lab_smoke.py` style) and wraps `load_model_and_tokenizer` /
   `build_axis_vector` in targeted `try/except` blocks, so HF/network/CUDA
@@ -87,6 +122,10 @@ hidden-state activation projection on DeepSeek-R1-Distill-Qwen-1.5B using
 
 ### Documentation
 
+- `docs/SKILL_ATTENTION_HUD.md`: Skill spec and host integration guide.
+- `docs/MCP_SERVER.md`: MCP setup and preview-first activation contract.
+- `docs/ENTERPRISE_RUNTIME_PROBE.md`: boundary document for the future
+  model-internal Runtime Probe line.
 - `docs/ADR_010_lab_contributor.md` (Proposed): architectural decision record.
 - `docs/EXECUTION_v03.md`: day-by-day implementation playbook.
 - `docs/PROJECT_v03.md`: external-facing v0.3 release notes.
@@ -204,4 +243,4 @@ for the full rationale.
 - Static Mode is a proxy signal and does not read hidden states.
 - Local activation probing is experimental and currently covers only a subset of axes.
 - Public benchmark and calibrated accuracy metrics are not yet included.
-- GitHub repository URLs are placeholders until the public repo exists.
+- Enterprise Runtime Probe is a documented direction, not a shipped implementation.

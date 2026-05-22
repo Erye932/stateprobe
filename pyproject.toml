@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "stateprobe"
 version = "0.3.0"
-description = "A debugger for prompts and LLM behavior."
+description = "An attention control layer for agents, plus prompt and LLM behavior debugging tools."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.9"
 authors = [
     { name = "StateProbe Contributors" }
 ]
-keywords = ["llm", "prompt-engineering", "prompt-debugging", "llm-evaluation", "persona-vectors", "activation-steering"]
+keywords = ["llm", "agent", "mcp", "claude-code", "prompt-engineering", "prompt-debugging", "llm-evaluation", "persona-vectors", "activation-steering"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -32,6 +32,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "mcp>=1.7.1",
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
 ]
@@ -42,9 +43,13 @@ lab = [
     "safetensors>=0.4.0",
     "numpy>=1.26.0",
 ]
+mcp = [
+    "mcp>=1.7.1",
+]
 
 [project.scripts]
 stateprobe = "stateprobe.cli:main"
+stateprobe-mcp = "stateprobe.mcp_server:main"
 
 [project.urls]
 Homepage = "https://github.com/Erye932/stateprobe"

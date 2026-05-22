@@ -4,7 +4,12 @@
 
 ## 1. 产品验收
 
-- [ ] 我能用一句话解释 StateProbe：检查 prompt 会把 AI 带到什么状态
+- [ ] 我能用一句话解释 StateProbe：给 agent 的注意力控制台，先让输出方向可见，再决定继续、重写、追问或切旧上下文
+- [ ] README 第一屏明确：Skill 已可用，Runtime Probe 是长期方向
+- [ ] 至少跑通一次 `stateprobe skill preview`
+- [ ] 至少跑通一次 `stateprobe skill overlay`
+- [ ] 至少看过 `docs/SKILL_ATTENTION_HUD.md`
+- [ ] 至少看过 `docs/MCP_SERVER.md`
 - [ ] `docs/PROJECT_BRIEF.md` 看得懂
 - [ ] `docs/DEMO_WALKTHROUGH.md` 的 3 个 demo 看得懂
 - [ ] 至少跑通一个 `stateprobe check` demo
@@ -15,6 +20,10 @@
 
 - [ ] `python -m pytest tests/ -q` 全部通过
 - [ ] `stateprobe --help` 正常
+- [ ] `stateprobe skill --help` 正常
+- [ ] `stateprobe skill preview --help` 正常
+- [ ] `stateprobe skill overlay --help` 正常
+- [ ] `stateprobe-mcp` 能被安装出来
 - [ ] `stateprobe check --help` 正常
 - [ ] `stateprobe eval run --help` 正常
 - [ ] `.gitignore` 包含 `.env`、`.env.*`、`*.key`
@@ -24,10 +33,12 @@
 
 - [ ] README 第一屏能说明项目价值
 - [ ] README 有安装方式
-- [ ] README 有最小使用示例
+- [ ] README 有 Skill 最小使用示例
+- [ ] README 有 MCP 安装说明
 - [ ] README 有 DeepSeek Lab / Black-box Eval 说明
 - [ ] README 明确说明 API key 使用环境变量
 - [ ] README 的 GitHub URL 已换成真实地址
+- [ ] `docs/ENTERPRISE_RUNTIME_PROBE.md` 没有暗示 Runtime Probe 已实现
 
 ## 4. GitHub 发布
 
@@ -62,6 +73,6 @@
 
 1. 测试全过
 2. README 看得懂
-3. Demo 能跑
+3. Skill / MCP 最小路径能跑
 4. 没泄露 API key
 5. 项目边界讲清楚

@@ -13,6 +13,8 @@ Describe the bug clearly.
 
 ```bash
 stateprobe check "..."
+# or:
+stateprobe skill preview --context-text "..." --plan-text "..."
 ```
 
 ## Expected behavior
@@ -30,6 +32,8 @@ Which mode is affected?
 - [ ] Static Mode
 - [ ] Black-box Eval
 - [ ] DeepSeek Lab
+- [ ] Skill preview / overlay
+- [ ] MCP server
 - [ ] Documentation
 - [ ] CLI / packaging
 

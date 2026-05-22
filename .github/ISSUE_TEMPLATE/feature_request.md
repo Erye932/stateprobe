@@ -17,9 +17,12 @@ Describe the feature or change.
 
 Which evidence layer does this affect?
 
+- [ ] Skill external control layer
+- [ ] MCP / agent-host integration
 - [ ] Static rule evidence
 - [ ] Black-box behavior evidence
 - [ ] Local activation evidence
+- [ ] Enterprise Runtime Probe direction
 - [ ] Report / explanation
 - [ ] Developer workflow
 

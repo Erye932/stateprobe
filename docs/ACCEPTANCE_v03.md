@@ -185,7 +185,7 @@ Move-Item lab_vectors/_temp.pt lab_vectors/r1_distill_1.5b_v1.pt
 **通过条件**
 
 - `pytest -q` 全绿
-- 测试数 ≥ 122（v0.2 baseline 108 + ≥14 新 lab/visibility/CLI 测试；当前 139）
+- 测试数 ≥ 122（v0.2 baseline 108 + ≥14 新 lab/visibility/CLI 测试；当前 153，含 +14 LLM panel UX regression）
 - `python scripts/acceptance_check.py` 0 failures, 0 warnings
 - `python scripts/acceptance_v02_stress.py` 仍 PASS（v0.2 backward compat 未破）
 

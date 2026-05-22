@@ -6,13 +6,15 @@ authors:
   - name: StateProbe Contributors
 repository-code: "https://github.com/Erye932/stateprobe"
 url: "https://github.com/Erye932/stateprobe"
-abstract: "StateProbe is a debugger for prompts and LLM behavior. It diagnoses prompt-induced behavior pressure across interpretable axes and separates static proxy evidence, black-box behavioral evidence, and local activation probing."
+abstract: "StateProbe is an attention control layer for agents, plus prompt and LLM behavior debugging tools. It separates the shipped Skill external-control layer from the longer-term Runtime Probe direction for model-internal vectors and activations."
 keywords:
   - llm
+  - agents
+  - mcp
   - prompt-debugging
   - llm-evaluation
   - activation-probing
   - persona-vectors
 license: MIT
-version: 0.2.0
-date-released: 2026-05-18
+version: 0.3.0
+date-released: 2026-05-22

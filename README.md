@@ -1,6 +1,7 @@
 # StateProbe
 
-> **A debugger for prompts and LLM behavior, DeepSeek-first.** StateProbe checks whether your prompt is likely to make a DeepSeek-style reasoning model actually answer, or drift into rambling, sycophancy, role-play, or overthinking.
+> **给 agent 的注意力控制台。**  
+> 现在可用的是外部控制 Skill：在 agent 正式输出前，先判断它有没有听懂、会不会跑偏、该继续还是该停下来重写 / 追问 / 切断旧上下文。长期方向是 Runtime Probe：面向开源模型内部向量、激活路径和路由状态的扫描与可视化。
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
@@ -9,11 +10,70 @@
 
 ---
 
+## 两条产品线
+
+StateProbe 分成两条线：一条已经能用，一条是长期方向。两者共享同一个目标：让大模型的行为更可见、更可诊断、更可控制，但边界不同。
+
+| 产品线 | 是什么 | 给谁用 | 状态 |
+|---|---|---|---|
+| **Skill — Agent Attention HUD** | 外部控制层：在 agent 输出前先看它准备关注什么，判断该继续、重写、追问，还是切断旧上下文；输出后再检查有没有跑偏。纯任务层注意力，不读模型内部。 | 接 agent、做 MCP、做 Claude Code / Cursor 集成的人 | ✅ 已可用 |
+| **Enterprise — Runtime Probe** | 内部状态扫描方向：面向开源模型的 activations、vectors、logits、router traces、输出状态和专业态报告。DeepSeek-first。 | 自部署模型、LLMOps、研究和平台团队 | 🛠 占位中，未实现 |
+
+这两条线必须分开说：
+
+- Skill 线不声称自己读了神经元或 hidden states。
+- Runtime Probe 线不声称自己能在拿不到模型内部的情况下工作。
+- Skill 的外部控制结果不能包装成 Runtime Probe 的内部扫描结果，反过来也一样。
+
+StateProbe 不是什么：
+
+- 不是简单正则 prompt 检查器
+- 不是 prompt 模板工具
+- 不是 SOP 生成器
+- 不是前端玩具
+
+快速入口：
+
+- Skill spec: [`docs/SKILL_ATTENTION_HUD.md`](docs/SKILL_ATTENTION_HUD.md)
+- MCP server: [`docs/MCP_SERVER.md`](docs/MCP_SERVER.md)
+- Enterprise direction: [`docs/ENTERPRISE_RUNTIME_PROBE.md`](docs/ENTERPRISE_RUNTIME_PROBE.md)
+- Try preview-first control: `stateprobe skill preview --context-text "小男孩拿着手机打游戏，重点是小男孩的沉浸感。" --plan-text "我准备画一个小男孩拿着手机，手机屏幕上显示游戏画面。"`
+- Try post-output overlay: `stateprobe skill overlay --context examples/skill_attention_context.txt --output examples/skill_attention_output.txt`
+
+## Skill 30 秒预览：写之前先拦一下
+
+StateProbe Skill 现在最重要的能力是 `preview`：agent 正式写、画、生成视频、做方案之前，先把“用户真正要什么”和“agent 准备关注什么”对一下。
+
+它会给 host 一个明确动作：
+
+| 动作 | 意思 |
+|---|---|
+| `continue` | 可以继续，理解基本对齐 |
+| `rewrite_planned_focus` | 先别输出，计划已经偏了，先重写 |
+| `ask_boundary_question` | 边界不清楚，先问用户一句 |
+| `cut_context_contamination` | 被旧上下文带偏了，先切掉旧方向 |
+
+例子：
+
+```bash
+stateprobe skill preview \
+  --context-text "小男孩拿着手机打游戏，重点是小男孩的沉浸感。" \
+  --plan-text "我准备画一个小男孩拿着手机，手机屏幕上显示游戏画面。"
+```
+
+这类场景里，Skill 会提醒 agent：用户要的重点可能是“沉浸感”，不一定真的要把手机屏幕上的游戏 UI 画出来。默认终端输出只展示产品化判断；需要底层证据时再加 `--debug`。
+
+下面保留的是原来的 `stateprobe check` 叙事：静态规则 → LLM judge → 本地 activation probe。这部分仍然可用，但 GitHub 首页现在优先按上面的两条产品线理解。
+
+---
+
 ## 这是什么
 
 代码写错了有 debugger 告诉你哪行挂了。Prompt 写烂了，AI 可能看起来很聪明，但其实在发散、迎合、装专家，或者没有回答核心问题。
 
 StateProbe 填这个空白：它诊断 prompt 会把模型推向什么行为状态，并给出可解释的污染源和改写建议。
+
+这也是 `stateprobe check` 这条旧线的定位：**A debugger for prompts and LLM behavior**。
 
 它的路线是 **DeepSeek-first, not DeepSeek-only**：
 
@@ -29,6 +89,12 @@ StateProbe 填这个空白：它诊断 prompt 会把模型推向什么行为状�
 <p align="center">
   <img src="docs/images/demo_report.png" alt="StateProbe HTML 报告：雷达图 + 对齐度诊断" width="700">
 </p>
+
+> **Windows / PowerShell 用户**：如果第一次跑出来看到 `鈹€鈹?` 这种乱码，先粘贴这一行到当前会话再重跑：
+> ```powershell
+> [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $OutputEncoding = [System.Text.Encoding]::UTF8
+> ```
+> 这是 PowerShell 默认 GBK 渲染 UTF-8 字节的限制（StateProbe 已经在内部把 stdout 切到 UTF-8，但 PowerShell 的 .NET 输出层 Python 子进程改不了）。`cmd.exe` / Windows Terminal / Linux / macOS 不受影响。
 
 ```bash
 $ stateprobe check --file demos/smart_but_not_answering/bad_prompt.txt
@@ -63,6 +129,8 @@ StateProbe 会指出它的风险：
 
 如果你想快速判断项目价值，先看：
 
+- [`docs/SKILL_ATTENTION_HUD.md`](docs/SKILL_ATTENTION_HUD.md)：Skill 线 — Agent Attention HUD 规格
+- [`docs/ENTERPRISE_RUNTIME_PROBE.md`](docs/ENTERPRISE_RUNTIME_PROBE.md)：企业线 — Runtime Probe 方向（占坑，未实现）
 - [`docs/PROJECT_BRIEF.md`](docs/PROJECT_BRIEF.md)：人话版项目说明
 - [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md)：统一项目总计划
 - [`docs/OPERATING_RULES.md`](docs/OPERATING_RULES.md)：项目执行规约（Visibility-first, engineering-grounded）
@@ -189,6 +257,12 @@ cd stateprobe
 pip install -e .
 ```
 
+如果要接 MCP / Claude Code / Cursor：
+
+```bash
+pip install -e ".[mcp]"
+```
+
 ### 方式 2：直接下载 ZIP（不用 Git）
 
 不想配 SSH？直接下载：
@@ -216,9 +290,17 @@ $ stateprobe
 └──────────────────────────────────────────────────┘
 ```
 
-> ⚠️ **Windows 终端显示**：如果看到乱码（鈹€鈹?），请使用 **Windows Terminal**（Win11 自带 / [Win10 从 Microsoft Store 安装](https://aka.ms/terminal)）而非旧版 `cmd.exe`。StateProbe 启动时会自动设置 UTF-8 编码（CP65001），但旧版终端的字体可能不支持 box-drawing 字符。
+> ⚠️ **Windows 终端显示**：StateProbe 启动时会主动设置 console code page = UTF-8 (CP65001) 并把 Python 的 `sys.stdout` 包成 UTF-8 TextIOWrapper。`cmd.exe` 和 **Windows Terminal**（Win11 自带 / [Win10 从 Microsoft Store 安装](https://aka.ms/terminal)）会正确渲染。
+>
+> 唯一例外是 **PowerShell**：它的 .NET 输出层（`[Console]::OutputEncoding`）Python 子进程改不了，所以第一次可能看到 `鈹€鈹?` 类乱码。修复办法是 30 秒 demo 上面那一行 setup snippet（一次会话只需要跑一次）。
 
 依赖很轻：`click`, `rich`。**无 LLM API 调用**——纯规则引擎、零成本、毫秒响应、可离线。
+
+Skill / MCP 线也是本地运行。启用 MCP 只会额外安装 MCP SDK，不会调用任何 LLM API：
+
+```bash
+stateprobe-mcp
+```
 
 如果要启用 v0.3 LabContributor（开源 DeepSeek hidden-state 投影层）：
 
@@ -231,6 +313,35 @@ pip install -e ".[lab]"
 ---
 
 ## 用法
+
+### Agent 输出前控制
+
+```bash
+stateprobe skill preview \
+  --context-text "核心是让 agent 的注意力可见。不要把格式化当主线。" \
+  --plan-text "我准备重点写 prompt 检查器和格式化模板。"
+```
+
+这会先判断 agent 能不能继续，还是应该重写、追问用户、切断旧上下文。
+
+如果要给 agent host / MCP 读完整 JSON：
+
+```bash
+stateprobe skill preview \
+  --context-text "核心是让 agent 的注意力可见。不要把格式化当主线。" \
+  --plan-text "我准备重点写 prompt 检查器和格式化模板。" \
+  --json
+```
+
+### Agent 输出后复盘
+
+```bash
+stateprobe skill overlay \
+  --context examples/skill_attention_context.txt \
+  --output examples/skill_attention_output.txt
+```
+
+这会检查 agent 实际输出有没有围绕用户重点，有没有弱化、忽略或违反要求。
 
 ### 快速诊断
 

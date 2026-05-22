@@ -252,3 +252,265 @@ def test_check_lab_augment_eager_surfaces_model_load_in_yellow_panel(monkeypatch
     assert "build_lab_vectors" not in result.output
     # Static layer still produced a report.
     assert "StateProbe" in result.output
+
+
+# ---------------------------------------------------------------------------
+# --llm-augment graceful-degradation regression tests (v0.3 UX audit P0-2)
+#
+# Before this round, --llm-augment failures (missing API key, 401, network
+# down) surfaced as a raw RuntimeWarning + 401 JSON dump in stderr — looked
+# like a crash to users. Now they get the same yellow panel UX as Lab
+# failures, via two paths:
+#   1. Pre-flight API-key check in CLI (eager-init analog).
+#   2. warnings.catch_warnings() around diagnose() catches the lazy
+#      RuntimeWarning that detect_readings() emits on contribute() failure.
+# Both paths route through _render_contributor_warning() with a hint from
+# _hint_for_llm_unavailable().
+# ---------------------------------------------------------------------------
+
+def _clear_llm_env(monkeypatch):
+    """Strip all LLM API-key env vars for tests that need a clean slate."""
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+
+def test_check_llm_augment_missing_api_key_shows_panel_and_continues(monkeypatch):
+    """--llm-augment with no API key in env or CLI must produce a yellow
+    panel and still render the static-only report.
+
+    Regression for P0-2 of the v0.3 UX audit.
+    """
+    _clear_llm_env(monkeypatch)
+    runner = CliRunner()
+    result = runner.invoke(main, [
+        "check",
+        "你是资深专家，请全面分析这个项目",
+        "--llm-augment",
+    ])
+    # Graceful degradation: exit 0, panel shown, static report still rendered.
+    assert result.exit_code == 0, (
+        f"--llm-augment without API key must degrade gracefully, got "
+        f"exit_code={result.exit_code}\n--- output ---\n{result.output}"
+    )
+    assert "LLM unavailable" in result.output or "LLM 层不可用" in result.output
+    # Missing-key hint must appear (NOT 401 / network / 5xx hints).
+    assert "DEEPSEEK_API_KEY" in result.output
+    # Must NOT leak 401 / authentication wording when the key is simply absent.
+    assert "API key 无效" not in result.output
+    # Static layer still rendered a report.
+    assert "StateProbe" in result.output
+
+
+def test_check_llm_augment_with_api_key_arg_skips_pre_flight_panel(monkeypatch):
+    """If --api-key is passed, pre-flight check passes — no panel yet.
+
+    This is a counter-test to the previous one: it guards against the
+    pre-flight check accidentally rejecting valid input.
+    """
+    _clear_llm_env(monkeypatch)
+    # Stub LLMJudgeContributor.contribute so we don't make a real API call.
+    # (The contributor is constructed because --api-key satisfies the
+    # pre-flight; contribute() is what gets called at runtime.)
+    from stateprobe.engines import llm_judge as llm_module
+
+    def fake_contribute(self, prompt, baseline=None):
+        from stateprobe.models import Axis
+        return {axis: [] for axis in Axis}  # no evidence, no panel
+
+    monkeypatch.setattr(
+        llm_module.LLMJudgeContributor, "contribute", fake_contribute,
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, [
+        "check",
+        "你是资深专家，请全面分析这个项目",
+        "--llm-augment",
+        "--api-key", "sk-fake-but-non-empty",
+    ])
+    assert result.exit_code == 0
+    # Pre-flight should NOT have fired — no LLM-unavailable panel.
+    assert "LLM unavailable" not in result.output
+    assert "LLM 层不可用" not in result.output
+
+
+def test_check_llm_augment_401_at_runtime_routes_through_panel(monkeypatch):
+    """When the API key exists but the API rejects it (401), the
+    RuntimeWarning emitted by detect_readings() must be caught by the
+    CLI's warnings.catch_warnings() wrapper and rendered as a yellow
+    panel with the 401-specific hint — NOT spilled to stderr as a raw
+    RuntimeWarning + JSON dump.
+
+    Regression for P0-2 lazy-failure path.
+    """
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-fake-non-empty")
+
+    from stateprobe.engines import llm_judge as llm_module
+    from stateprobe.engines.base import EngineUnavailable
+
+    def fake_contribute(self, prompt, baseline=None):
+        raise EngineUnavailable(
+            'LLM judge 不可用: API 请求失败 (401): '
+            '{"error":{"message":"Authentication Fails, Your api key: ****fake is invalid",'
+            '"type":"authentication_error","code":"invalid_request_error"}}'
+        )
+
+    monkeypatch.setattr(
+        llm_module.LLMJudgeContributor, "contribute", fake_contribute,
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, [
+        "check",
+        "你是资深专家，请全面分析这个项目",
+        "--llm-augment",
+    ])
+    assert result.exit_code == 0
+    # Yellow panel must appear (NOT raw stderr dump).
+    assert "LLM unavailable" in result.output or "LLM 层不可用" in result.output
+    # 401-specific hint must appear (NOT missing-key / network / 5xx).
+    assert "API key 无效" in result.output or "重新申请" in result.output
+    # Missing-key wording must NOT appear (would be wrong context).
+    assert "未找到 API key" not in result.output
+    # Static layer still produced a report.
+    assert "StateProbe" in result.output
+
+
+@pytest.mark.parametrize(
+    "exc_message,expected_hint_keyword,forbidden_hint_keyword",
+    [
+        # Missing key (English form)
+        (
+            "LLM judge 不可用: missing api key in environment",
+            "DEEPSEEK_API_KEY",
+            "API key 无效",
+        ),
+        # Missing key (Chinese form — matches chat_completion._get_api_key)
+        (
+            "LLM judge 不可用: 未找到 API key。请设置环境变量 DEEPSEEK_API_KEY",
+            "DEEPSEEK_API_KEY",
+            "API key 无效",
+        ),
+        # 401 authentication failure (real DeepSeek error body)
+        (
+            'LLM judge 不可用: API 请求失败 (401): {"error":{"message":"Authentication Fails"',
+            "API key 无效",
+            "DEEPSEEK_API_KEY (或",
+        ),
+        # 403 forbidden
+        (
+            "LLM judge 不可用: API 请求失败 (403): forbidden",
+            "API key 无效",
+            "限流",
+        ),
+        # Rate limit
+        (
+            "LLM judge 不可用: API 请求失败 (429): rate limit exceeded",
+            "限流",
+            "API key 无效",
+        ),
+        # 5xx server error (must come AFTER 401/403/404 in matcher order)
+        (
+            "LLM judge 不可用: API 请求失败 (502): bad gateway",
+            "服务端错误",
+            "限流",
+        ),
+        # Network / DNS
+        (
+            "LLM judge 不可用: <urlopen error [Errno 11001] getaddrinfo failed>",
+            "不可达",
+            "API key 无效",
+        ),
+        # Timeout
+        (
+            "LLM judge 不可用: urlopen timeout while reading API",
+            "不可达",
+            "API key 无效",
+        ),
+        # 404 model not found
+        (
+            "LLM judge 不可用: API 请求失败 (404): {\"error\":{\"message\":\"model not found\"",
+            "模型名不存在",
+            "API key 无效",
+        ),
+        # Malformed JSON from judge
+        (
+            "LLM judge 不可用: LLM judge 返回的 JSON 解析失败: Expecting value",
+            "非法 JSON",
+            "API key 无效",
+        ),
+    ],
+)
+def test_check_llm_hint_matcher_routes_each_failure_class_correctly(
+    monkeypatch, exc_message, expected_hint_keyword, forbidden_hint_keyword,
+):
+    """Lock the contract between LLMJudgeContributor's EngineUnavailable
+    messages and the CLI's context-aware hint matcher
+    (_hint_for_llm_unavailable).
+
+    Each row is a representative real-world exception text → the keyword
+    expected in the rendered hint, plus a keyword that MUST NOT appear
+    (catches accidental fall-through to the wrong branch — exactly the
+    bug class that P0-4 of the previous audit found for Lab).
+    """
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-fake-non-empty")
+
+    from stateprobe.engines import llm_judge as llm_module
+    from stateprobe.engines.base import EngineUnavailable
+
+    def fake_contribute(self, prompt, baseline=None):
+        raise EngineUnavailable(exc_message)
+
+    monkeypatch.setattr(
+        llm_module.LLMJudgeContributor, "contribute", fake_contribute,
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, [
+        "check",
+        "你是资深专家",
+        "--llm-augment",
+    ])
+    assert result.exit_code == 0
+    assert expected_hint_keyword in result.output, (
+        f"hint matcher missed:\n  message: {exc_message}\n"
+        f"  expected '{expected_hint_keyword}' in output\n"
+        f"  --- output ---\n{result.output}"
+    )
+    assert forbidden_hint_keyword not in result.output, (
+        f"hint matcher fell through wrong branch:\n  message: {exc_message}\n"
+        f"  forbidden '{forbidden_hint_keyword}' was in output\n"
+        f"  --- output ---\n{result.output}"
+    )
+
+
+def test_check_llm_and_lab_both_unavailable_static_still_renders(monkeypatch, tmp_path):
+    """All-layers-down stress test: --llm-augment without key + --lab-augment
+    with missing vectors must still produce a static-only report (exit 0,
+    two yellow panels, normal report).
+
+    Catches regressions where wrapping diagnose() in catch_warnings could
+    accidentally suppress the static layer.
+    """
+    _clear_llm_env(monkeypatch)
+    bogus = tmp_path / "no_such.pt"
+    runner = CliRunner()
+    result = runner.invoke(main, [
+        "check",
+        "你是资深专家，请全面分析这个项目",
+        "--llm-augment",
+        "--lab-augment",
+        "--lab-vectors", str(bogus),
+    ])
+    assert result.exit_code == 0, (
+        f"both layers unavailable must still degrade gracefully, got "
+        f"exit_code={result.exit_code}\n--- output ---\n{result.output}"
+    )
+    # Two yellow panels appeared.
+    assert "LLM unavailable" in result.output or "LLM 层不可用" in result.output
+    assert "Lab unavailable" in result.output or "Lab 层不可用" in result.output
+    # Static layer still produced the report header + axis table.
+    assert "StateProbe" in result.output
+    assert "各轴读数" in result.output

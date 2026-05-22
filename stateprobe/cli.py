@@ -8,7 +8,10 @@ from pathlib import Path
 from typing import Optional
 
 import io
+import json
 import os
+import re
+import warnings
 
 import click
 from rich.console import Console
@@ -82,6 +85,205 @@ def _ensure_utf8_windows() -> None:
 _ensure_utf8_windows()
 
 console = Console(force_terminal=True)
+
+
+# ---------------------------------------------------------------------------
+# Contributor failure UX (yellow panels with context-aware hints)
+#
+# Every optional contributor (LLM judge, Lab activation projection, future
+# embedding contributor) follows the same UX contract:
+#   1. If the contributor cannot run (no API key, no GPU, no vectors,
+#      malformed file, …) the CLI shows ONE yellow panel naming the layer
+#      and giving an actionable next-step hint.
+#   2. The remaining contributors still produce a report (graceful
+#      degradation; exit code 0).
+#
+# Two paths produce the same panel UX:
+#   A. Eager init failure  → CLI catches EngineUnavailable from constructor
+#      (LabContributor with --lab-eager, LLM API-key pre-flight).
+#   B. Lazy runtime failure → detect_readings() emits RuntimeWarning
+#      (LLM 401 on first call, Lab lazy model-load failure). The CLI wraps
+#      diagnose() in warnings.catch_warnings() and translates each captured
+#      RuntimeWarning into the same panel.
+#
+# Both paths route through _render_contributor_warning() so the user can't
+# tell which one fired — they just see "⚠ Lab unavailable" / "⚠ LLM
+# unavailable" with the right hint.
+# ---------------------------------------------------------------------------
+
+def _hint_for_lab_unavailable(msg: str) -> str:
+    """Return an actionable hint for a LabContributor failure message.
+
+    Tested by test_check_lab_hint_matcher_routes_each_failure_class_correctly.
+    """
+    msg_lower = msg.lower()
+    if "cuda" in msg_lower:
+        return (
+            "需要本地 NVIDIA GPU + CUDA。无 GPU 请省略 [bold]--lab-augment[/bold]，"
+            "静态层 (+ 可选 LLM) 仍会出报告。"
+        )
+    if (
+        "torch not installed" in msg_lower
+        or "transformers" in msg_lower
+        or "lab dependencies missing" in msg_lower
+        or "stateprobe.lab.probe unavailable" in msg_lower
+        or "stateprobe.lab.cache unavailable" in msg_lower
+    ):
+        return "缺少可选依赖。安装：[bold]pip install -e \".[lab]\"[/bold]"
+    if (
+        "not found" in msg_lower
+        or "no vectors" in msg_lower
+        or "no recognized axes" in msg_lower
+        or "failed to load" in msg_lower
+        or "schema_version" in msg_lower
+    ):
+        return (
+            "缺 vectors 文件或文件损坏。先跑 "
+            "[bold]python scripts/build_lab_vectors.py[/bold] 重新生成，"
+            "或用 [bold]--lab-vectors[/bold] 指向已有文件。"
+        )
+    if "model load failed" in msg_lower:
+        return (
+            "模型加载失败。设环境变量 "
+            "[bold]STATEPROBE_LAB_MODEL_PATH[/bold] 指向本地 snapshot，"
+            "或先用 ModelScope/HF CLI 预下载。"
+        )
+    return (
+        "省略 [bold]--lab-augment[/bold] 跑无 Lab 层；"
+        "详细诊断见 [bold]docs/EXECUTION_v03.md[/bold]。"
+    )
+
+
+def _hint_for_llm_unavailable(msg: str) -> str:
+    """Return an actionable hint for an LLMJudgeContributor failure message.
+
+    Mirrors the Lab hint matcher so LLM failures get the same context-aware
+    UX (instead of the previous raw RuntimeWarning stderr dump). Each branch
+    is locked by test_check_llm_hint_matcher_routes_each_failure_class_correctly.
+    """
+    msg_lower = msg.lower()
+    # Missing API key — matches both the Chinese "未找到 API key" raised by
+    # chat_completion._get_api_key and the English "missing api key".
+    if "未找到 api key" in msg_lower or "missing api key" in msg_lower:
+        return (
+            "设环境变量 [bold]DEEPSEEK_API_KEY[/bold] (或 [bold]OPENAI_API_KEY[/bold])，"
+            "或用 [bold]--api-key[/bold] 传入。"
+        )
+    # Authentication failure (401 / 403 / "Authentication Fails")
+    if (
+        "401" in msg
+        or "403" in msg
+        or "authentication" in msg_lower
+        or "unauthorized" in msg_lower
+        or "invalid_request_error" in msg_lower
+    ):
+        return (
+            "API key 无效或已过期。检查 [bold]DEEPSEEK_API_KEY[/bold] 是否正确，"
+            "或在 https://platform.deepseek.com 重新申请。"
+        )
+    # Model not found
+    if "404" in msg and "model" in msg_lower:
+        return (
+            "模型名不存在。用 [bold]--llm-model[/bold] 指定可用模型 "
+            "(如 [bold]deepseek-chat[/bold]、[bold]deepseek-reasoner[/bold])。"
+        )
+    # Network / DNS / proxy
+    if (
+        "connection" in msg_lower
+        or "timeout" in msg_lower
+        or "timed out" in msg_lower
+        or "unreachable" in msg_lower
+        or "name or service" in msg_lower
+        or "getaddrinfo" in msg_lower
+    ):
+        return (
+            "API 不可达。检查网络/代理；或用 [bold]--llm-base-url[/bold] 切换 endpoint。"
+        )
+    # Rate limit
+    if "429" in msg or "rate limit" in msg_lower:
+        return "API 触发限流，稍后重试或升级配额。"
+    # 5xx — server-side error (must come AFTER the 401/403/404 checks)
+    if re.search(r"\b5\d\d\b", msg):
+        return (
+            "API 服务端错误。稍后重试；"
+            "或用 [bold]--llm-base-url[/bold] 切换到备用 endpoint。"
+        )
+    # Malformed JSON from judge
+    if "json" in msg_lower and ("解析失败" in msg or "未找到" in msg or "parse" in msg_lower):
+        return (
+            "LLM 判官返回了非法 JSON。换一个 [bold]--llm-model[/bold]，"
+            "或省略 [bold]--llm-augment[/bold] 跑无 LLM 层。"
+        )
+    return (
+        "省略 [bold]--llm-augment[/bold] 跑无 LLM 层；"
+        "或检查 [bold]--llm-model[/bold] / [bold]--llm-base-url[/bold] / [bold]DEEPSEEK_API_KEY[/bold]。"
+    )
+
+
+def _render_contributor_warning(layer_name: str, msg: str, hint: str) -> None:
+    """Render a yellow panel for a contributor unavailability.
+
+    Used by both the eager-init try/except path (e.g. --lab-eager,
+    LLM API-key pre-flight) and the lazy-runtime warnings.catch_warnings()
+    path so users see a consistent message regardless of which contributor
+    failed and at which lifecycle stage.
+    """
+    console.print(Panel(
+        Text.from_markup(
+            f"[yellow]{layer_name} 层不可用：[/yellow] {msg}\n"
+            f"[dim]Hint: {hint}[/dim]"
+        ),
+        title=f"⚠ {layer_name} unavailable",
+        border_style="yellow",
+    ))
+
+
+# Compiled once: parse the standard "Contributor '<name>' unavailable;
+# dropping its evidence: <message>" string detect_readings() emits.
+_CONTRIB_WARNING_RE = re.compile(
+    r"Contributor '([^']+)' unavailable.*?dropping its evidence:\s*(.*)",
+    re.DOTALL,
+)
+
+
+def _route_captured_warnings(caught: list) -> None:
+    """Translate captured RuntimeWarnings from detect_readings() into panels.
+
+    Non-RuntimeWarning entries are re-emitted so external warning consumers
+    (pytest -W, library callers) keep seeing them. Stateprobe's own
+    contributor-drop warnings get rendered as yellow panels matching the
+    eager-init UX.
+    """
+    for w in caught:
+        if not issubclass(w.category, RuntimeWarning):
+            warnings.warn_explicit(
+                str(w.message), w.category, w.filename, w.lineno,
+            )
+            continue
+        match = _CONTRIB_WARNING_RE.search(str(w.message))
+        if not match:
+            warnings.warn_explicit(
+                str(w.message), w.category, w.filename, w.lineno,
+            )
+            continue
+        contrib_name = match.group(1)
+        contrib_msg = match.group(2).strip()
+        if contrib_name == "llm_judge":
+            _render_contributor_warning(
+                "LLM", contrib_msg, _hint_for_llm_unavailable(contrib_msg),
+            )
+        elif contrib_name == "lab":
+            _render_contributor_warning(
+                "Lab", contrib_msg, _hint_for_lab_unavailable(contrib_msg),
+            )
+        else:
+            console.print(Panel(
+                Text.from_markup(
+                    f"[yellow]Contributor '{contrib_name}' 不可用：[/yellow] {contrib_msg}"
+                ),
+                title="⚠ Contributor unavailable",
+                border_style="yellow",
+            ))
 
 
 # ---------------------------------------------------------------------------
@@ -576,7 +778,8 @@ def ask(target_name: str, model_name: str) -> None:
     is_flag=True,
     default=False,
     help="启用 LLM 语义层。在静态规则之外叠加 LLM-as-Judge 的证据"
-         "（v0.2 hybrid，需要 DEEPSEEK_API_KEY）。两层证据合并后再聚合。",
+         "（v0.2 hybrid，需要 DEEPSEEK_API_KEY 或 --api-key）。"
+         "缺 key 或 API 不可用时，会以黄色面板提示并降级到只跑静态层。",
 )
 @click.option(
     "--engine",
@@ -691,11 +894,26 @@ def check(
 
     llm_contributor = None
     if llm_augment:
-        llm_contributor = LLMJudgeContributor(
-            model=llm_model,
-            base_url=llm_base_url,
-            api_key=api_key,
+        # Pre-flight: API key must be resolvable. Fail fast with a yellow
+        # panel rather than letting the missing-key error surface deep
+        # inside detect_readings() on first contribute() (raw RuntimeWarning
+        # with 401 JSON dump in stderr — the old "looks unreliable" UX).
+        # Closes P0-2 of the v0.3 UX audit and mirrors the Lab eager-init
+        # pre-flight pattern.
+        has_key = bool(api_key) or bool(
+            os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
         )
+        if not has_key:
+            msg = "未找到 API key。"
+            _render_contributor_warning(
+                "LLM", msg, _hint_for_llm_unavailable("未找到 api key"),
+            )
+        else:
+            llm_contributor = LLMJudgeContributor(
+                model=llm_model,
+                base_url=llm_base_url,
+                api_key=api_key,
+            )
 
     # --lab-eager only meaningful with --lab-augment. Warn so users don't
     # silently get the lazy fallback when they thought they enabled eager.
@@ -738,73 +956,41 @@ def check(
                     model_name=lab_model,
                 )
         except EngineUnavailable as exc:
-            # Degrade gracefully: lab layer unavailable, static (+ optional LLM)
-            # still produce a result. Pick an actionable hint based on the
-            # specific sub-failure so the user knows what to fix.
+            # Degrade gracefully: lab layer unavailable, static (+ optional
+            # LLM) still produce a result. Hint matcher lives in module
+            # scope so the lazy-runtime path (RuntimeWarning) and the
+            # eager-init path (this try/except) route through the same
+            # branches — single source of truth.
             msg = str(exc)
-            msg_lower = msg.lower()
-            if "cuda" in msg_lower:
-                hint = (
-                    "需要本地 NVIDIA GPU + CUDA。无 GPU 请省略 [bold]--lab-augment[/bold]，"
-                    "静态层 (+ 可选 LLM) 仍会出报告。"
-                )
-            elif (
-                "torch not installed" in msg_lower
-                or "transformers" in msg_lower
-                or "lab dependencies missing" in msg_lower
-                or "stateprobe.lab.probe unavailable" in msg_lower
-                or "stateprobe.lab.cache unavailable" in msg_lower
-            ):
-                hint = "缺少可选依赖。安装：[bold]pip install -e \".[lab]\"[/bold]"
-            elif (
-                "not found" in msg_lower
-                or "no vectors" in msg_lower
-                or "no recognized axes" in msg_lower
-                or "failed to load" in msg_lower            # vectors 文件损坏 / I/O 异常
-                or "schema_version" in msg_lower            # vectors 文件 schema 太新
-            ):
-                hint = (
-                    "缺 vectors 文件或文件损坏。先跑 "
-                    "[bold]python scripts/build_lab_vectors.py[/bold] 重新生成，"
-                    "或用 [bold]--lab-vectors[/bold] 指向已有文件。"
-                )
-            elif "model load failed" in msg_lower:
-                hint = (
-                    "模型加载失败。设环境变量 "
-                    "[bold]STATEPROBE_LAB_MODEL_PATH[/bold] 指向本地 snapshot，"
-                    "或先用 ModelScope/HF CLI 预下载。"
-                )
-            else:
-                hint = "省略 [bold]--lab-augment[/bold] 跑无 Lab 层；详细诊断见 [bold]docs/EXECUTION_v03.md[/bold]。"
-            console.print(Panel(
-                Text.from_markup(
-                    f"[yellow]Lab 层不可用：[/yellow] {msg}\n"
-                    f"[dim]Hint: {hint}[/dim]"
-                ),
-                title="⚠ Lab unavailable",
-                border_style="yellow",
-            ))
+            _render_contributor_warning(
+                "Lab", msg, _hint_for_lab_unavailable(msg),
+            )
             lab_contributor = None
         except ImportError as exc:
-            console.print(Panel(
-                Text.from_markup(
-                    f"[yellow]Lab 层依赖未安装：[/yellow] {exc}\n"
-                    f"[dim]Hint: [bold]pip install -e \".[lab]\"[/bold][/dim]"
-                ),
-                title="⚠ Lab dependencies missing",
-                border_style="yellow",
-            ))
+            _render_contributor_warning(
+                "Lab",
+                f"Lab 层依赖未安装：{exc}",
+                "[bold]pip install -e \".[lab]\"[/bold]",
+            )
             lab_contributor = None
 
-    # Note: EngineUnavailable from contributors is caught silently
-    # inside detect_readings — static evidence still produces a result.
-    report = diagnose(
-        text,
-        target_name=target_name,
-        model_name=model_name,
-        llm_augment=llm_contributor,
-        lab_augment=lab_contributor,
-    )
+    # Wrap diagnose() in warnings.catch_warnings so any RuntimeWarning the
+    # detector emits when an optional contributor raises EngineUnavailable
+    # at first contribute() (e.g., LLM 401 lazy-call failure, lab lazy
+    # model-load failure) gets translated into the same yellow panel UX
+    # as eager-init failures. Closes P0-2 of the v0.3 UX audit — previously
+    # users saw a raw RuntimeWarning + 401 JSON dump in stderr and assumed
+    # the tool was broken.
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", RuntimeWarning)
+        report = diagnose(
+            text,
+            target_name=target_name,
+            model_name=model_name,
+            llm_augment=llm_contributor,
+            lab_augment=lab_contributor,
+        )
+    _route_captured_warnings(caught)
 
     if not no_terminal:
         render_terminal(report)
@@ -865,6 +1051,828 @@ def axes() -> None:
             axis.high_end_zh,
         )
     console.print(table)
+
+
+@main.group()
+def skill() -> None:
+    """StateProbe Skill：Agent 注意力仪表盘。"""
+
+
+def _render_skill_group(title: str, rows: list, style: str) -> None:
+    if not rows:
+        return
+    table = Table(
+        title=title,
+        header_style="bold cyan",
+        border_style=style,
+        show_lines=True,
+    )
+    table.add_column("用户要求", style="white")
+    table.add_column("覆盖度", justify="right", style="cyan")
+    table.add_column("命中内容", style="grey70")
+    for item in rows:
+        matched = "、".join(item.matched_keywords[:8]) if item.matched_keywords else "-"
+        table.add_row(
+            item.requirement.text,
+            f"{item.coverage:.2f}",
+            matched,
+        )
+    console.print(table)
+
+
+_ALIGNMENT_STYLE = {
+    "aligned": "green",
+    "partial": "yellow",
+    "off_task": "grey50",
+    "violation": "red",
+}
+
+_PRIORITY_STYLE = {
+    "must": "cyan",
+    "must_not": "red",
+    "supporting": "grey70",
+}
+
+_INTERRUPT_STYLE = {
+    "ok": "bold green",
+    "watch": "bold yellow",
+    "interrupt": "bold red",
+}
+
+_INTERRUPT_LABEL = {
+    "ok": "OK · 输出可继续",
+    "watch": "WATCH · 关注偏移",
+    "interrupt": "INTERRUPT · 建议打断当前输出",
+}
+
+_SEVERITY_STYLE = {
+    "high": "bold red",
+    "medium": "bold yellow",
+    "low": "grey70",
+}
+
+_RISK_BORDER = {
+    "low": "green",
+    "medium": "yellow",
+    "high": "bright_red",
+}
+
+
+def _skill_bar(weight: float, width: int = 12) -> str:
+    """Unicode block bar for Skill HUD weight visualization (0.0~1.0).
+
+    与项目里 check 命令使用的 ``_bar(value, width, target=...)`` 不同：
+    后者返回 rich Text 且需要 target 参数；这里只返回纯字符串，用于拼
+    接进 intent / attention map 表格。
+    """
+    try:
+        w = float(weight)
+    except (TypeError, ValueError):
+        w = 0.0
+    w = max(0.0, min(1.0, w))
+    filled = int(round(w * width))
+    return "█" * filled + "░" * (width - filled)
+
+
+def _render_attention_hud(hud) -> None:
+    drift_style = {
+        "low": "bold green",
+        "medium": "bold yellow",
+        "high": "bold red",
+    }.get(hud.drift_level, "bold white")
+    interrupt_style = _INTERRUPT_STYLE.get(hud.interrupt_level, "bold white")
+    interrupt_label = _INTERRUPT_LABEL.get(
+        hud.interrupt_level, hud.interrupt_level
+    )
+
+    summary = Text()
+    summary.append("偏移程度：", style="grey70")
+    summary.append(f"{hud.drift_level}", style=drift_style)
+    summary.append(f"  ({hud.drift_score:.2f})\n", style="grey70")
+    summary.append("Interrupt：", style="grey70")
+    summary.append(f"{interrupt_label}\n", style=interrupt_style)
+    summary.append("已体现：", style="grey70")
+    summary.append(str(len(hud.reflected)), style="bold green")
+    summary.append("  弱体现：", style="grey70")
+    summary.append(str(len(hud.weak)), style="bold yellow")
+    summary.append("  被忽略：", style="grey70")
+    summary.append(str(len(hud.ignored)), style="bold red")
+    summary.append("  被违反：", style="grey70")
+    summary.append(str(len(hud.violated)), style="bold red")
+    console.print(Panel(
+        summary,
+        title="StateProbe Skill · Agent Attention HUD",
+        border_style="magenta",
+    ))
+
+    if hud.core_focus:
+        focus = Text()
+        for item in hud.core_focus:
+            focus.append(f"- {item}\n", style="white")
+        console.print(Panel(focus, title="核心关注", border_style="cyan"))
+
+    # Phase 7 ①：用户意图地图
+    if hud.user_intent_map:
+        intent_table = Table(
+            show_header=True, header_style="bold cyan", expand=True
+        )
+        intent_table.add_column("priority", width=10)
+        intent_table.add_column("weight", width=20)
+        intent_table.add_column("intent", overflow="fold")
+        for sig in hud.user_intent_map:
+            style = _PRIORITY_STYLE.get(sig.priority, "white")
+            intent_table.add_row(
+                Text(sig.priority, style=style),
+                Text(
+                    f"{_skill_bar(sig.weight)} {sig.weight:.2f}", style=style
+                ),
+                sig.label,
+            )
+        console.print(Panel(
+            intent_table,
+            title="① User Intent Map · 用户要什么",
+            border_style="cyan",
+        ))
+
+    # Phase 7 ②：Agent 注意力地图
+    if hud.agent_attention_map:
+        att_table = Table(
+            show_header=True, header_style="bold magenta", expand=True
+        )
+        att_table.add_column("alignment", width=12)
+        att_table.add_column("weight", width=20)
+        att_table.add_column("focus", overflow="fold")
+        for sig in hud.agent_attention_map:
+            style = _ALIGNMENT_STYLE.get(sig.alignment, "white")
+            att_table.add_row(
+                Text(sig.alignment, style=style),
+                Text(
+                    f"{_skill_bar(sig.weight)} {sig.weight:.2f}", style=style
+                ),
+                Text(sig.label, style=style),
+            )
+        console.print(Panel(
+            att_table,
+            title="② Agent Attention Map · agent 现在关注什么",
+            border_style="magenta",
+        ))
+
+    # Phase 7 ③：意图与注意力之间的缺口
+    if hud.attention_gaps:
+        gap_table = Table(
+            show_header=True, header_style="bold yellow", expand=True
+        )
+        gap_table.add_column("kind", width=14)
+        gap_table.add_column("severity", width=10)
+        gap_table.add_column("label", overflow="fold")
+        gap_table.add_column("why", overflow="fold")
+        for g in hud.attention_gaps:
+            sev_style = _SEVERITY_STYLE.get(g.severity, "white")
+            gap_table.add_row(
+                g.kind,
+                Text(g.severity, style=sev_style),
+                g.label,
+                g.why,
+            )
+        console.print(Panel(
+            gap_table,
+            title="③ Attention Gaps · 意图与注意力的缺口",
+            border_style="yellow",
+        ))
+
+    # Phase 7 ④：输出走向预测
+    if hud.output_trajectory is not None:
+        traj = hud.output_trajectory
+        risk_style = {
+            "low": "bold green",
+            "medium": "bold yellow",
+            "high": "bold red",
+        }.get(traj.risk, "bold white")
+        traj_text = Text()
+        traj_text.append("likely_direction：", style="grey70")
+        traj_text.append(f"{traj.likely_direction}\n", style="white")
+        traj_text.append("risk：", style="grey70")
+        traj_text.append(f"{traj.risk}", style=risk_style)
+        traj_text.append("    confidence：", style="grey70")
+        traj_text.append(f"{traj.confidence}\n", style="bold white")
+        if traj.why:
+            traj_text.append("why：\n", style="grey70")
+            for line in traj.why:
+                traj_text.append(f"  - {line}\n", style="white")
+        console.print(Panel(
+            traj_text,
+            title="④ Output Trajectory · 继续写下去会怎样",
+            border_style=_RISK_BORDER.get(traj.risk, "grey50"),
+        ))
+
+    # Phase 7 ⑤：下一轮可执行的控制杆
+    levers = hud.control_levers
+    if levers and (
+        levers.boost or levers.suppress or levers.stop_doing or levers.return_to
+    ):
+        lever_table = Table(
+            show_header=True, header_style="bold white", expand=True
+        )
+        lever_table.add_column("boost (拉回)", style="green", overflow="fold")
+        lever_table.add_column(
+            "return_to (回到)", style="green", overflow="fold"
+        )
+        lever_table.add_column("suppress (压低)", style="red", overflow="fold")
+        lever_table.add_column(
+            "stop_doing (停止)", style="red", overflow="fold"
+        )
+        rows = max(
+            len(levers.boost),
+            len(levers.return_to),
+            len(levers.suppress),
+            len(levers.stop_doing),
+        )
+        for i in range(rows):
+            lever_table.add_row(
+                levers.boost[i] if i < len(levers.boost) else "",
+                levers.return_to[i] if i < len(levers.return_to) else "",
+                levers.suppress[i] if i < len(levers.suppress) else "",
+                levers.stop_doing[i] if i < len(levers.stop_doing) else "",
+            )
+        console.print(Panel(
+            lever_table,
+            title="⑤ Control Levers · 下一轮可执行的注意力调节",
+            border_style="bright_blue",
+        ))
+
+    _render_skill_group("已体现要求", hud.reflected, "green")
+    _render_skill_group("被弱化要求", hud.weak, "yellow")
+    _render_skill_group("被忽略要求", hud.ignored, "red")
+    _render_skill_group("被违反要求", hud.violated, "red")
+
+    if hud.next_turn_patch:
+        patch = Text()
+        for line in hud.next_turn_patch:
+            patch.append(f"- {line}\n", style="white")
+        console.print(Panel(patch, title="下一轮纠偏", border_style="yellow"))
+
+    notes = Text()
+    for note in hud.notes:
+        notes.append(f"- {note}\n", style="grey70")
+    console.print(Panel(notes, title="边界说明", border_style="grey39"))
+
+
+def _render_attention_preview(preview, debug: bool = False) -> None:
+    risk_style = {
+        "low": "bold green",
+        "medium": "bold yellow",
+        "high": "bold red",
+    }.get(preview.risk_level, "bold white")
+    continue_style = "bold green" if preview.should_continue else "bold red"
+
+    summary = Text()
+    summary.append("Risk：", style="grey70")
+    summary.append(f"{preview.risk_level}", style=risk_style)
+    summary.append(f"  ({preview.risk_score:.2f})\n", style="grey70")
+    summary.append("Should continue：", style="grey70")
+    summary.append(str(preview.should_continue), style=continue_style)
+    console.print(Panel(
+        summary,
+        title="StateProbe · 执行边界预览",
+        border_style=_RISK_BORDER.get(preview.risk_level, "magenta"),
+    ))
+
+    decision = getattr(preview, "activation_decision", None)
+    if decision:
+        decision_style = "bold red" if decision.should_stop else "bold green"
+        decision_text = Text()
+        decision_text.append("Action：", style="grey70")
+        decision_text.append(decision.action, style=decision_style)
+        decision_text.append("\nStop before output：", style="grey70")
+        decision_text.append(str(decision.should_stop), style=decision_style)
+        decision_text.append("\nReason：", style="grey70")
+        decision_text.append(decision.reason, style="white")
+        decision_text.append("\nMessage：", style="grey70")
+        decision_text.append(decision.message, style="white")
+        if decision.blockers:
+            decision_text.append("\nBlockers：", style="grey70")
+            decision_text.append(", ".join(decision.blockers), style="yellow")
+        console.print(Panel(
+            decision_text,
+            title="⓪ Activation Decision · Agent 下一步",
+            border_style="red" if decision.should_stop else "green",
+        ))
+
+    boundary = getattr(preview, "boundary_decomposition", None)
+    if boundary:
+        boundary_table = Table(
+            show_header=True, header_style="bold cyan", expand=True
+        )
+        boundary_table.add_column("must_show", style="green", overflow="fold")
+        boundary_table.add_column("can_imply", style="yellow", overflow="fold")
+        boundary_table.add_column(
+            "must_not_show", style="red", overflow="fold"
+        )
+        rows = max(
+            len(boundary.must_show),
+            len(boundary.can_imply),
+            len(boundary.must_not_show),
+            1,
+        )
+        for i in range(rows):
+            boundary_table.add_row(
+                boundary.must_show[i].element
+                if i < len(boundary.must_show) else "",
+                boundary.can_imply[i].element
+                if i < len(boundary.can_imply) else "",
+                boundary.must_not_show[i].element
+                if i < len(boundary.must_not_show) else "",
+            )
+        console.print(Panel(
+            boundary_table,
+            title="① Boundary Contract · 必须显示 / 可暗示 / 禁止显示",
+            border_style="cyan",
+        ))
+
+    if getattr(preview, "literalization_risks", None):
+        risk_table = Table(
+            show_header=True, header_style="bold red", expand=True
+        )
+        risk_table.add_column("element", width=12)
+        risk_table.add_column("literal result", overflow="fold")
+        risk_table.add_column("risk", overflow="fold")
+        for risk in preview.literalization_risks:
+            sev_style = _SEVERITY_STYLE.get(risk.severity, "white")
+            risk_table.add_row(
+                Text(risk.element, style=sev_style),
+                risk.literal_interpretation,
+                risk.risk_description,
+            )
+        console.print(Panel(
+            risk_table,
+            title="② Literalization Risk · 可能被模型字面化的地方",
+            border_style="red",
+        ))
+
+    if getattr(preview, "boundary_questions", None):
+        q_text = Text()
+        for q in preview.boundary_questions:
+            q_text.append(f"{q.question}\n", style="bold white")
+            for option in q.options:
+                suffix = "（推荐）" if option.recommended else ""
+                q_text.append(
+                    f"  {option.label}. {option.description}{suffix}\n",
+                    style="yellow" if option.recommended else "white",
+                )
+            q_text.append("\n")
+        console.print(Panel(
+            q_text,
+            title="③ Boundary Questions · 生成前先确认",
+            border_style="yellow",
+        ))
+
+    if getattr(preview, "context_contamination_risks", None):
+        contamination_table = Table(
+            show_header=True, header_style="bold red", expand=True
+        )
+        contamination_table.add_column("severity", width=10)
+        contamination_table.add_column("old focus", overflow="fold")
+        contamination_table.add_column("active focus", overflow="fold")
+        contamination_table.add_column("why", overflow="fold")
+        for risk in preview.context_contamination_risks:
+            sev_style = _SEVERITY_STYLE.get(risk.severity, "white")
+            contamination_table.add_row(
+                Text(risk.severity, style=sev_style),
+                risk.source_context,
+                risk.active_context,
+                risk.reason,
+            )
+        console.print(Panel(
+            contamination_table,
+            title="④ Context Contamination · 旧上下文残留风险",
+            border_style="red",
+        ))
+
+    if debug and preview.user_intent_map:
+        intent_table = Table(
+            show_header=True, header_style="bold cyan", expand=True
+        )
+        intent_table.add_column("priority", width=10)
+        intent_table.add_column("weight", width=20)
+        intent_table.add_column("intent", overflow="fold")
+        for sig in preview.user_intent_map:
+            style = _PRIORITY_STYLE.get(sig.priority, "white")
+            intent_table.add_row(
+                Text(sig.priority, style=style),
+                Text(
+                    f"{_skill_bar(sig.weight)} {sig.weight:.2f}", style=style
+                ),
+                sig.label,
+            )
+        console.print(Panel(
+            intent_table,
+            title="⑤ User Intent Map · 用户要什么",
+            border_style="cyan",
+        ))
+
+    if debug and preview.planned_attention_map:
+        planned_table = Table(
+            show_header=True, header_style="bold magenta", expand=True
+        )
+        planned_table.add_column("alignment", width=12)
+        planned_table.add_column("weight", width=20)
+        planned_table.add_column("planned focus", overflow="fold")
+        for sig in preview.planned_attention_map:
+            style = _ALIGNMENT_STYLE.get(sig.alignment, "white")
+            planned_table.add_row(
+                Text(sig.alignment, style=style),
+                Text(
+                    f"{_skill_bar(sig.weight)} {sig.weight:.2f}", style=style
+                ),
+                Text(sig.label, style=style),
+            )
+        console.print(Panel(
+            planned_table,
+            title="⑥ Planned Attention Map · 正文开始前准备关注什么",
+            border_style="magenta",
+        ))
+
+    if debug and preview.missing_before_start:
+        gap_table = Table(
+            show_header=True, header_style="bold yellow", expand=True
+        )
+        gap_table.add_column("kind", width=14)
+        gap_table.add_column("severity", width=10)
+        gap_table.add_column("label", overflow="fold")
+        gap_table.add_column("why", overflow="fold")
+        for gap in preview.missing_before_start:
+            sev_style = _SEVERITY_STYLE.get(gap.severity, "white")
+            gap_table.add_row(
+                gap.kind,
+                Text(gap.severity, style=sev_style),
+                gap.label,
+                gap.why,
+            )
+        console.print(Panel(
+            gap_table,
+            title="⑦ Missing Before Start · 正文前已暴露的缺口",
+            border_style="yellow",
+        ))
+
+    levers = preview.control_levers
+    if debug and levers and (
+        levers.boost or levers.suppress or levers.stop_doing or levers.return_to
+    ):
+        lever_table = Table(
+            show_header=True, header_style="bold white", expand=True
+        )
+        lever_table.add_column("boost", style="green", overflow="fold")
+        lever_table.add_column("return_to", style="green", overflow="fold")
+        lever_table.add_column("suppress", style="red", overflow="fold")
+        lever_table.add_column("stop_doing", style="red", overflow="fold")
+        rows = max(
+            len(levers.boost),
+            len(levers.return_to),
+            len(levers.suppress),
+            len(levers.stop_doing),
+        )
+        for i in range(rows):
+            lever_table.add_row(
+                levers.boost[i] if i < len(levers.boost) else "",
+                levers.return_to[i] if i < len(levers.return_to) else "",
+                levers.suppress[i] if i < len(levers.suppress) else "",
+                levers.stop_doing[i] if i < len(levers.stop_doing) else "",
+            )
+        console.print(Panel(
+            lever_table,
+            title="⑧ Control Levers · 正文开始前先调注意力",
+            border_style="bright_blue",
+        ))
+
+    if preview.opening_patch:
+        patch = Text()
+        for line in preview.opening_patch:
+            patch.append(f"- {line}\n", style="white")
+        console.print(Panel(
+            "\n".join(preview.opening_patch),
+            title="⑨ Opening Patch · 建议正文开头先做什么",
+            border_style="green",
+        ))
+
+    notes = Text()
+    for note in preview.notes:
+        notes.append(f"- {note}\n", style="grey70")
+    console.print(Panel(notes, title="边界说明", border_style="grey39"))
+
+
+def _resolve_skill_inputs(
+    context_path: Optional[str],
+    agent_output_path: Optional[str],
+    context_text: Optional[str],
+    agent_output_text: Optional[str],
+    stdin_json: bool,
+) -> tuple[str, str]:
+    """从三种来源解析 (user_context, agent_output)：文件 / 直传文本 / stdin JSON。
+
+    优先级：``--stdin-json`` > ``--*-text`` > ``--context/--output`` 文件路径。
+    三种来源 *互斥*，便于 agent host 不落盘直接调用。
+    """
+    if stdin_json and (
+        context_path or agent_output_path or context_text or agent_output_text
+    ):
+        raise click.UsageError(
+            "--stdin-json 不能与 --context / --output / --context-text / "
+            "--output-text 同时使用。"
+        )
+
+    if stdin_json:
+        raw = sys.stdin.read()
+        if not raw.strip():
+            raise click.UsageError("--stdin-json 已启用但 stdin 为空。")
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise click.UsageError(f"--stdin-json 解析失败：{exc}") from exc
+        if not isinstance(payload, dict):
+            raise click.UsageError(
+                "--stdin-json 期望对象 {\"context\": ..., \"output\": ...}。"
+            )
+        ctx = payload.get("context")
+        out = payload.get("output")
+        if not isinstance(ctx, str) or not isinstance(out, str):
+            raise click.UsageError(
+                "--stdin-json 需要 context 和 output 两个字符串字段。"
+            )
+        return ctx.strip(), out.strip()
+
+    if context_path and context_text:
+        raise click.UsageError(
+            "--context 与 --context-text 不能同时使用。"
+        )
+    if agent_output_path and agent_output_text:
+        raise click.UsageError(
+            "--output 与 --output-text 不能同时使用。"
+        )
+
+    if context_text is not None:
+        user_context = context_text.strip()
+    elif context_path:
+        user_context = Path(context_path).read_text(encoding="utf-8").strip()
+    else:
+        raise click.UsageError(
+            "缺少用户上下文：请提供 --context PATH 或 --context-text TEXT "
+            "或 --stdin-json。"
+        )
+
+    if agent_output_text is not None:
+        agent_output = agent_output_text.strip()
+    elif agent_output_path:
+        agent_output = (
+            Path(agent_output_path).read_text(encoding="utf-8").strip()
+        )
+    else:
+        raise click.UsageError(
+            "缺少 agent 输出：请提供 --output PATH 或 --output-text TEXT "
+            "或 --stdin-json。"
+        )
+
+    return user_context, agent_output
+
+
+def _resolve_skill_preview_inputs(
+    context_path: Optional[str],
+    plan_path: Optional[str],
+    context_text: Optional[str],
+    plan_text: Optional[str],
+    stdin_json: bool,
+) -> tuple[str, str]:
+    if stdin_json and (context_path or plan_path or context_text or plan_text):
+        raise click.UsageError(
+            "--stdin-json 不能与 --context / --plan / --context-text / "
+            "--plan-text 同时使用。"
+        )
+
+    if stdin_json:
+        raw = sys.stdin.read()
+        if not raw.strip():
+            raise click.UsageError("--stdin-json 已启用但 stdin 为空。")
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise click.UsageError(f"--stdin-json 解析失败：{exc}") from exc
+        if not isinstance(payload, dict):
+            raise click.UsageError(
+                "--stdin-json 期望对象 {\"context\": ..., \"plan\": ...}。"
+            )
+        ctx = payload.get("context")
+        plan = payload.get("plan", payload.get("planned_focus"))
+        if not isinstance(ctx, str) or not isinstance(plan, str):
+            raise click.UsageError(
+                "--stdin-json 需要 context 和 plan 两个字符串字段。"
+            )
+        return ctx.strip(), plan.strip()
+
+    if context_path and context_text:
+        raise click.UsageError(
+            "--context 与 --context-text 不能同时使用。"
+        )
+    if plan_path and plan_text:
+        raise click.UsageError("--plan 与 --plan-text 不能同时使用。")
+
+    if context_text is not None:
+        user_context = context_text.strip()
+    elif context_path:
+        user_context = Path(context_path).read_text(encoding="utf-8").strip()
+    else:
+        raise click.UsageError(
+            "缺少用户上下文：请提供 --context PATH 或 --context-text TEXT "
+            "或 --stdin-json。"
+        )
+
+    if plan_text is not None:
+        planned_focus = plan_text.strip()
+    elif plan_path:
+        planned_focus = Path(plan_path).read_text(encoding="utf-8").strip()
+    else:
+        raise click.UsageError(
+            "缺少 planned focus：请提供 --plan PATH 或 --plan-text TEXT "
+            "或 --stdin-json。"
+        )
+
+    return user_context, planned_focus
+
+
+@skill.command("preview")
+@click.option(
+    "--context",
+    "context_path",
+    required=False,
+    default=None,
+    type=click.Path(exists=True, dir_okay=False),
+    help="用户上下文文件。与 --context-text / --stdin-json 互斥。",
+)
+@click.option(
+    "--plan",
+    "plan_path",
+    required=False,
+    default=None,
+    type=click.Path(exists=True, dir_okay=False),
+    help="agent 计划关注内容文件。与 --plan-text / --stdin-json 互斥。",
+)
+@click.option(
+    "--context-text",
+    "context_text",
+    required=False,
+    default=None,
+    type=str,
+    help="直接传入用户上下文文本。",
+)
+@click.option(
+    "--plan-text",
+    "plan_text",
+    required=False,
+    default=None,
+    type=str,
+    help="直接传入 agent 正文前计划关注内容。",
+)
+@click.option(
+    "--stdin-json",
+    "stdin_json",
+    is_flag=True,
+    default=False,
+    help='从 stdin 读 JSON：{"context": "...", "plan": "..."}。',
+)
+@click.option(
+    "--json",
+    "json_mode",
+    is_flag=True,
+    default=False,
+    help="输出机器可读 JSON。",
+)
+@click.option(
+    "--debug",
+    "debug",
+    is_flag=True,
+    default=False,
+    help="显示底层 attention map / gap / control levers 技术面板。",
+)
+def skill_preview(
+    context_path: Optional[str],
+    plan_path: Optional[str],
+    context_text: Optional[str],
+    plan_text: Optional[str],
+    stdin_json: bool,
+    json_mode: bool,
+    debug: bool,
+) -> None:
+    """正文开始前生成 Opening Attention Preview。"""
+    from stateprobe.skill import preview_attention
+
+    user_context, planned_focus = _resolve_skill_preview_inputs(
+        context_path,
+        plan_path,
+        context_text,
+        plan_text,
+        stdin_json,
+    )
+    preview = preview_attention(user_context, planned_focus)
+
+    if json_mode:
+        click.echo(json.dumps(preview.to_dict(), ensure_ascii=False, indent=2))
+        return
+
+    _render_attention_preview(preview, debug=debug)
+
+
+@skill.command("overlay")
+@click.option(
+    "--context",
+    "context_path",
+    required=False,
+    default=None,
+    type=click.Path(exists=True, dir_okay=False),
+    help="用户上下文文件。与 --context-text / --stdin-json 互斥。",
+)
+@click.option(
+    "--output",
+    "agent_output_path",
+    required=False,
+    default=None,
+    type=click.Path(exists=True, dir_okay=False),
+    help="agent 已输出内容文件。与 --output-text / --stdin-json 互斥。",
+)
+@click.option(
+    "--context-text",
+    "context_text",
+    required=False,
+    default=None,
+    type=str,
+    help="直接传入用户上下文文本（agent host 友好，不需落盘）。",
+)
+@click.option(
+    "--output-text",
+    "agent_output_text",
+    required=False,
+    default=None,
+    type=str,
+    help="直接传入 agent 输出文本（agent host 友好，不需落盘）。",
+)
+@click.option(
+    "--stdin-json",
+    "stdin_json",
+    is_flag=True,
+    default=False,
+    help='从 stdin 读 JSON：{"context": "...", "output": "..."}。',
+)
+@click.option(
+    "--json",
+    "json_mode",
+    is_flag=True,
+    default=False,
+    help="输出机器可读 JSON。",
+)
+@click.option(
+    "--control-patch",
+    "control_patch",
+    is_flag=True,
+    default=False,
+    help="只输出下一轮纠偏提示。",
+)
+def skill_overlay(
+    context_path: Optional[str],
+    agent_output_path: Optional[str],
+    context_text: Optional[str],
+    agent_output_text: Optional[str],
+    stdin_json: bool,
+    json_mode: bool,
+    control_patch: bool,
+) -> None:
+    """生成 Agent 注意力仪表盘。
+
+    输入来源三选一（互斥）：
+    - 文件：``--context PATH --output PATH``
+    - 直传文本：``--context-text TEXT --output-text TEXT``
+    - stdin JSON：``--stdin-json``（读 ``{"context":"...","output":"..."}``）
+    """
+    from stateprobe.skill import analyze_attention
+
+    user_context, agent_output = _resolve_skill_inputs(
+        context_path,
+        agent_output_path,
+        context_text,
+        agent_output_text,
+        stdin_json,
+    )
+    hud = analyze_attention(user_context, agent_output)
+
+    if json_mode:
+        click.echo(json.dumps(hud.to_dict(), ensure_ascii=False, indent=2))
+        return
+
+    if control_patch:
+        if not hud.next_turn_patch:
+            click.echo("未发现明显需要纠偏的要求。")
+            return
+        for line in hud.next_turn_patch:
+            click.echo(f"- {line}")
+        return
+
+    _render_attention_hud(hud)
 
 
 @main.group()
