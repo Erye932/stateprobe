@@ -2,7 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/stateprobe.svg)](https://pypi.org/project/stateprobe/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Erye932/stateprobe/blob/main/LICENSE)
-[![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![Tests](https://github.com/Erye932/stateprobe/actions/workflows/ci.yml/badge.svg)](https://github.com/Erye932/stateprobe/actions/workflows/ci.yml)
 
 > **LLM agent 的注意力控制层。**

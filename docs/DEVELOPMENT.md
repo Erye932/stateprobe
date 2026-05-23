@@ -99,7 +99,7 @@ stateprobe/
 
 ### 3.1 系统要求
 
-- Python ≥ 3.9（推荐 3.11 / 3.12）
+- Python ≥ 3.10（推荐 3.11 / 3.12）
 - Windows / macOS / Linux 都可
 - 可选：CUDA GPU（仅 lab 模块需要）
 
