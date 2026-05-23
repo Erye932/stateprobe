@@ -63,3 +63,10 @@ drafts/
 .discrim_*.log
 .snapshot_*.log
 .modelscope_*.log
+
+# Lab vectors — large ML artifacts. The v1 file ships in-repo (~27KB) so
+# users can run --lab-augment out of the box; any other .pt build outputs
+# are local artifacts. Add new files explicitly with `git add -f` only if
+# you intend to ship them.
+lab_vectors/*.pt
+!lab_vectors/r1_distill_1.5b_v1.pt
