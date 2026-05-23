@@ -49,7 +49,7 @@ pip install "stateprobe[lab]"
 
 ## 30-second demo
 
-Before the agent answers, preview its planned focus:
+Copy-paste this after `pip install stateprobe` to catch a bad plan before it ships:
 
 ```bash
 stateprobe skill preview \

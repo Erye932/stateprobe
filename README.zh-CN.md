@@ -77,7 +77,7 @@ pip install -e .
 
 ## 30 秒 demo
 
-agent 张嘴前——预览它打算谈什么：
+安装后直接复制这段，先看它怎么在 agent 张嘴前拦住错重点：
 
 ```bash
 stateprobe skill preview \
