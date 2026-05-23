@@ -4,7 +4,7 @@ Outputs a table of raw cosine values so we can decide:
 - Whether MIN_LAB_CONFIDENCE = 0.15 is too strict for 1.5B distilled.
   (Day 4 outcome: yes — final value lowered to 0.10 and confidence is now
   sigmoid-mapped via `sigmoid(10 * (|raw| - 0.15))`. See lab.py comments
-  + TECHNICAL_v03.md §6.4.)
+  + docs/archive/v0.3/TECHNICAL.md §6.4.)
 - Whether the contrastive pairs need redesign.
 - Whether layer -1 is the wrong layer to extract from.
 

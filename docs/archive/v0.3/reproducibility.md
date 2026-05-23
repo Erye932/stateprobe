@@ -122,7 +122,7 @@ python scripts/build_lab_vectors.py
 
 ```bash
 python scripts/discrim_table.py --skip-llm
-# → docs/v03_discrim_report.md  (5 examples × 4 axes × 2-3 layers)
+# → docs/archive/v0.3/discrim_report.md  (5 examples × 4 axes × 2-3 layers)
 ```
 
 ### 7. End-to-end CLI

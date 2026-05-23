@@ -150,7 +150,7 @@ def _hint_for_lab_unavailable(msg: str) -> str:
         )
     return (
         "省略 [bold]--lab-augment[/bold] 跑无 Lab 层；"
-        "详细诊断见 [bold]docs/EXECUTION_v03.md[/bold]。"
+        "详细诊断见 [bold]docs/archive/v0.3/EXECUTION.md[/bold]。"
     )
 
 

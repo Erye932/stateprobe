@@ -5,7 +5,7 @@ actually runs on this machine — model loading, activation extraction, axis
 vector construction, and projection all work, with acceptable latency and
 GPU memory headroom.
 
-This is the G1 gate for v0.3 LabContributor per docs/ACCEPTANCE_v03.md.
+This is the G1 gate for v0.3 LabContributor per docs/archive/v0.3/ACCEPTANCE.md.
 
 Usage:
     python scripts/lab_smoke.py

@@ -3,7 +3,7 @@
 发版前必须全过的 7 个 gate。每个 gate 有：通过条件、验证命令、失败应对。
 
 来源：`~/.windsurf/plans/v03-lab-contributor-bacc8d.md` §6
-配套：[EXECUTION_v03.md](EXECUTION_v03.md) · [TECHNICAL_v03.md](TECHNICAL_v03.md) · [PROJECT_v03.md](PROJECT_v03.md)
+配套：[EXECUTION.md](EXECUTION.md) · [TECHNICAL.md](TECHNICAL.md) · [PROJECT.md](PROJECT.md)
 
 ---
 
@@ -124,7 +124,7 @@ print(f'G2 PASS: {len(store.vectors)} axes, {size_mb:.1f}MB')
 
 **通过条件**
 
-- `docs/v03_discrim_report.md` 提交
+- `docs/archive/v0.3/discrim_report.md` 提交
 - 5 examples × 4 axes 三层对比表完整
 - **至少 2 个 case 存在「lab 与 static/LLM 有意义分歧」**
   - 「有意义」定义：lab 的 normalized_score 与 static/LLM aggregate score 差 > 0.20
@@ -135,7 +135,7 @@ print(f'G2 PASS: {len(store.vectors)} axes, {size_mb:.1f}MB')
 
 ```powershell
 python scripts/discrim_table.py
-# 看 docs/v03_discrim_report.md 末尾的 G3 evaluation 段
+# 看 docs/archive/v0.3/discrim_report.md 末尾的 G3 evaluation 段
 ```
 
 **失败应对（分歧不足）**
@@ -208,28 +208,28 @@ python scripts/acceptance_v02_stress.py
 
 **通过条件**
 
-- `docs/EXECUTION_v03.md`（本文档存在前置文档）
-- `docs/TECHNICAL_v03.md`
-- `docs/PROJECT_v03.md`
-- `docs/ACCEPTANCE_v03.md`（本文档）
-- `docs/ADR_010_lab_contributor.md`（状态 Accepted）
+- `docs/archive/v0.3/EXECUTION.md`（本文档存在前置文档）
+- `docs/archive/v0.3/TECHNICAL.md`
+- `docs/archive/v0.3/PROJECT.md`
+- `docs/archive/v0.3/ACCEPTANCE.md`（本文档）
+- `docs/adr/010-lab-contributor.md`（状态 Accepted）
 - `README.md` 含 "Activation probing" 小节
 - `CHANGELOG.md` 含 0.3.0 完整条目
-- `docs/v03_reproducibility.md`：英文单页可贴 HN
-- `docs/v03_discrim_report.md`：G3 结果归档
+- `docs/archive/v0.3/reproducibility.md`：英文单页可贴 HN
+- `docs/archive/v0.3/discrim_report.md`：G3 结果归档
 - 所有 internal link 不 404
 
 **验证命令**
 
 ```powershell
 $docs = @(
-  "docs/EXECUTION_v03.md",
-  "docs/TECHNICAL_v03.md",
-  "docs/PROJECT_v03.md",
-  "docs/ACCEPTANCE_v03.md",
-  "docs/ADR_010_lab_contributor.md",
-  "docs/v03_reproducibility.md",
-  "docs/v03_discrim_report.md"
+  "docs/archive/v0.3/EXECUTION.md",
+  "docs/archive/v0.3/TECHNICAL.md",
+  "docs/archive/v0.3/PROJECT.md",
+  "docs/archive/v0.3/ACCEPTANCE.md",
+  "docs/adr/010-lab-contributor.md",
+  "docs/archive/v0.3/reproducibility.md",
+  "docs/archive/v0.3/discrim_report.md"
 )
 $docs | ForEach-Object { Test-Path $_ } | Where-Object { $_ -eq $false }
 # 应该没有输出（全都存在）

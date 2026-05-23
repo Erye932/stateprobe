@@ -10,7 +10,7 @@ Usage:
 Output:
     lab_vectors/r1_distill_1.5b_v1.pt  (~ 10-50MB depending on hidden_dim)
 
-This is the G2 gate in docs/ACCEPTANCE_v03.md.
+This is the G2 gate in docs/archive/v0.3/ACCEPTANCE.md.
 
 Exit codes:
     0  success

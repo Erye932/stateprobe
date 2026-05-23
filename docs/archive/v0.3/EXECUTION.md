@@ -3,7 +3,7 @@
 Day-by-day operational checklist. 每一步都有验证命令和回滚指令。
 
 来源：`~/.windsurf/plans/v03-lab-contributor-bacc8d.md`（私人战略计划）
-配套：[TECHNICAL_v03.md](TECHNICAL_v03.md) · [ACCEPTANCE_v03.md](ACCEPTANCE_v03.md) · [PROJECT_v03.md](PROJECT_v03.md) · [ADR_010_lab_contributor.md](ADR_010_lab_contributor.md)
+配套：[TECHNICAL.md](TECHNICAL.md) · [ACCEPTANCE.md](ACCEPTANCE.md) · [PROJECT.md](PROJECT.md) · [ADR_010](../../adr/010-lab-contributor.md)
 
 ---
 
@@ -99,7 +99,7 @@ Day-by-day operational checklist. 每一步都有验证命令和回滚指令。
 | 步 | 内容 |
 |---|---|
 | 4.1 | 新增 `scripts/discrim_table.py`：在 5 examples × 4 轴 × {static / LLM / lab} 上跑出对比表 |
-| 4.2 | 输出 `docs/v03_discrim_report.md`：3 列对比表 + 每个分歧 case 的简要分析 |
+| 4.2 | 输出 `docs/archive/v0.3/discrim_report.md`：3 列对比表 + 每个分歧 case 的简要分析 |
 | 4.3 | 评 G3 通过：至少 2 个 case 存在「lab 与 static/LLM 有意义的分歧」 |
 
 **失败应对（G3 fail）**：
@@ -108,7 +108,7 @@ Day-by-day operational checklist. 每一步都有验证命令和回滚指令。
 - 连续 2 轮失败 → 承认 Persona Vectors 在 1.5B distilled 模型上不够强，降级方案：将 lab 视为「确认层」而非「证据层」，PR 文案诚实承认
 - 全部失败 → Phase 2 不启动，v0.3 范围降级为「lab 数据集 + 复现脚本」而非「lab contributor」
 
-**Day 4 完成标志**：`docs/v03_discrim_report.md` 提交，G3 评估写在文档末尾。
+**Day 4 完成标志**：`docs/archive/v0.3/discrim_report.md` 提交，G3 评估写在文档末尾。
 
 ---
 
@@ -118,7 +118,7 @@ Day-by-day operational checklist. 每一步都有验证命令和回滚指令。
 |---|---|
 | 5.1 | 新增 `stateprobe/engines/lab.py`：`class LabContributor` 实现 `EvidenceContributor` 协议 |
 | 5.2 | 构造函数接 pre-computed vectors（不重入模型每次 diagnose）+ lazy load |
-| 5.3 | `contribute(prompt, baseline)` → 投影 → `weight = sigmoid(4·\|raw\|)`；`confidence = sigmoid(10·(\|raw\|-0.15))`（Day 4 校准结果，详见 TECHNICAL_v03 §6.4） |
+| 5.3 | `contribute(prompt, baseline)` → 投影 → `weight = sigmoid(4·\|raw\|)`；`confidence = sigmoid(10·(\|raw\|-0.15))`（Day 4 校准结果，详见 TECHNICAL §6.4） |
 | 5.4 | `\|raw\| < MIN_LAB_CONFIDENCE`（最终 0.10，原计划 0.15 在 1.5B distilled 上太严，详见 lab.py 注释）silently drop |
 | 5.5 | 单测 `tests/test_engines_lab.py`：新增 ≥ 14 个 lab 测试（mock model + mock vectors）+ silent-drop 可见性回归测试 |
 | 5.6 | 错误处理：vectors 缺失 → `EngineUnavailable`（at `__init__`）；torch / CUDA 缺失 → `EngineUnavailable`（at `__init__`，eager check 关掉 CLI 静默降级 UX gap）；模型加载失败 → `EngineUnavailable`（lazy at first `contribute()`）|
@@ -149,13 +149,13 @@ Day-by-day operational checklist. 每一步都有验证命令和回滚指令。
 
 | 步 | 内容 |
 |---|---|
-| 10.1 | `docs/ADR_010_lab_contributor.md`：架构决策记录 |
-| 10.2 | `docs/TECHNICAL_v03.md`：算法 + 接口 + 性能 + 风险 |
-| 10.3 | `docs/PROJECT_v03.md`：用户视角，能拿到什么 |
-| 10.4 | `docs/ACCEPTANCE_v03.md`：6 个 gate 状态最终化 |
+| 10.1 | `docs/adr/010-lab-contributor.md`：架构决策记录 |
+| 10.2 | `docs/archive/v0.3/TECHNICAL.md`：算法 + 接口 + 性能 + 风险 |
+| 10.3 | `docs/archive/v0.3/PROJECT.md`：用户视角，能拿到什么 |
+| 10.4 | `docs/archive/v0.3/ACCEPTANCE.md`：6 个 gate 状态最终化 |
 | 10.5 | `README.md` 加 "Activation probing" 小节 |
 | 10.6 | `CHANGELOG.md` 写 0.3.0 条目 |
-| 10.7 | 英文 reproducibility 报告 `docs/v03_reproducibility.md`：单页可贴 HN |
+| 10.7 | 英文 reproducibility 报告 `docs/archive/v0.3/reproducibility.md`：单页可贴 HN |
 | 10.8 | bump `pyproject.toml` 到 0.3.0，bump `__init__.py` 版本 |
 | 10.9 | `git tag -a v0.3.0 -m "LabContributor: Persona Vectors on R1-Distill"` |
 | 10.10 | GitHub Release notes 复用 CHANGELOG 0.3.0 段 |

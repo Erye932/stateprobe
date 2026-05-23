@@ -6,7 +6,7 @@
 
 ## 1. 架构概览
 
-按 [ADR_009](ADR_009_hybrid_engine.md) 落地的四层架构：
+按 [ADR_009](adr/009-hybrid-engine.md) 落地的四层架构：
 
 ```
 prompt
@@ -84,10 +84,10 @@ stateprobe/
 ├── demos/                      # 可直接跑的 prompt 示例
 ├── docs/                       # 项目文档
 │   ├── ARCHITECTURE.md         # 架构总图（这份是简版）
-│   ├── ADR_009_hybrid_engine.md # 关键架构决定
-│   ├── DECISIONS.md            # 决策日志（短摘要）
 │   ├── DEVELOPMENT.md          # 本文档
-│   ├── RUNBOOK.md              # 运维手册
+│   ├── adr/                    # 架构决策 ADR
+│   ├── governance/             # 项目治理 / 内部規划 / RUNBOOK
+│   ├── archive/                # 历史版本报告（v0.2 / v0.3）
 │   └── ...
 ├── pyproject.toml              # 包定义 + 依赖
 └── README.md                   # 用户入口
@@ -158,8 +158,8 @@ pip install -e ".[lab]"
 
 ### 4.2 加一个新功能
 
-1. 在 [`docs/DECISIONS.md`](DECISIONS.md) 写一条决定（即使简短）
-2. 大改动 → 在 `docs/ADR_NNN_xxx.md` 写 ADR 等审核
+1. 在 [`docs/adr/decisions.md`](adr/decisions.md) 写一条决定（即使简短）
+2. 大改动 → 在 `docs/adr/NNN-xxx.md` 写 ADR 等审核
 3. 写测试（先 fail）
 4. 实现
 5. 跑测试 + acceptance + 压力测
@@ -336,7 +336,7 @@ python scripts/acceptance_check.py
 
 # 真实 LLM 压力测试（消耗 API 配额，一次约 14 次调用）
 python scripts/acceptance_v02_stress.py
-# 输出到 docs/v02_stress_report.txt
+# 输出到 docs/archive/v0.2/stress_report.txt
 ```
 
 ### 6.3 写测试的原则
@@ -405,7 +405,7 @@ def diagnose(
 
 ### 8.2 发版前 checklist（每条必须打勾）
 
-参见 [`RUNBOOK.md`](RUNBOOK.md) 的发版章节。简版：
+参见 [`governance/RUNBOOK.md`](governance/RUNBOOK.md) 的发版章节。简版：
 
 ```
 [ ] python -m pytest -q  # 全绿
@@ -448,7 +448,7 @@ def diagnose(
 **Q: LLM 引擎返回 EngineUnavailable**
 - 检查 `DEEPSEEK_API_KEY` 是否设置
 - 检查网络连通：`curl https://api.deepseek.com/v1/models -H "Authorization: Bearer $DEEPSEEK_API_KEY"`
-- 看 `docs/v02_stress_report.txt` 最后的 API_BOUNDARY 部分
+- 看 `docs/archive/v0.2/stress_report.txt` 最后的 API_BOUNDARY 部分
 
 **Q: 中文在 PowerShell 里显示乱码**
 - 工具内部已用 UTF-8，PowerShell 管道（`|`）会把 stdout 转回 GBK
@@ -508,11 +508,11 @@ for c in contributors:
 ## 12. 进阶资源
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - 架构总览
-- [ADR_009_hybrid_engine.md](ADR_009_hybrid_engine.md) - hybrid 架构的完整决策依据
-- [DECISIONS.md](DECISIONS.md) - 所有重大决策的简短记录
+- [adr/009-hybrid-engine.md](adr/009-hybrid-engine.md) - hybrid 架构的完整决策依据
+- [adr/decisions.md](adr/decisions.md) - 所有重大决策的简短记录
 - [EVIDENCE_MODEL.md](EVIDENCE_MODEL.md) - 证据数据模型详解
-- [QUALITY_BAR.md](QUALITY_BAR.md) - 代码 / 文档 / 发布质量标准
-- [RUNBOOK.md](RUNBOOK.md) - 运维 / 发版 / 平台发布 SOP
+- [governance/QUALITY_BAR.md](governance/QUALITY_BAR.md) - 代码 / 文档 / 发布质量标准
+- [governance/RUNBOOK.md](governance/RUNBOOK.md) - 运维 / 发版 / 平台发布 SOP
 
 ---
 

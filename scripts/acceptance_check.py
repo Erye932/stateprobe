@@ -71,17 +71,17 @@ def check_required_files(result: Result) -> None:
         ".github/ISSUE_TEMPLATE/bug_report.md",
         ".github/ISSUE_TEMPLATE/feature_request.md",
         ".github/ISSUE_TEMPLATE/rule_request.md",
-        "docs/PROJECT_BRIEF.md",
-        "docs/PROJECT_PLAN.md",
-        "docs/OPERATING_RULES.md",
+        "docs/governance/PROJECT_BRIEF.md",
+        "docs/governance/PROJECT_PLAN.md",
+        "docs/governance/OPERATING_RULES.md",
         "docs/DEMO_WALKTHROUGH.md",
         "docs/ARCHITECTURE.md",
         "docs/EVIDENCE_MODEL.md",
         "docs/DEEPSEEK_ROADMAP.md",
         "docs/FAQ.md",
-        "docs/QUALITY_BAR.md",
-        "docs/OPEN_SOURCE_PLAN.md",
-        "docs/CONTRIBUTOR_VISIBILITY_PLAN.md",
+        "docs/governance/QUALITY_BAR.md",
+        "docs/governance/OPEN_SOURCE_PLAN.md",
+        "docs/governance/CONTRIBUTOR_VISIBILITY_PLAN.md",
         "docs/PUBLISHING.md",
         "docs/RELEASE_CHECKLIST.md",
         "demos/README.md",
@@ -134,15 +134,15 @@ def check_readme(result: Result) -> None:
         # Demo path — EN README still links to the legacy demo by directory
         "smart_but_not_answering",
         # Doc links (must remain wired up after rewrite)
-        "docs/PROJECT_PLAN.md",
-        "docs/OPERATING_RULES.md",
+        "docs/governance/PROJECT_PLAN.md",
+        "docs/governance/OPERATING_RULES.md",
         "docs/ARCHITECTURE.md",
         "docs/EVIDENCE_MODEL.md",
         "docs/DEEPSEEK_ROADMAP.md",
         "docs/FAQ.md",
-        "docs/QUALITY_BAR.md",
-        "docs/OPEN_SOURCE_PLAN.md",
-        "docs/CONTRIBUTOR_VISIBILITY_PLAN.md",
+        "docs/governance/QUALITY_BAR.md",
+        "docs/governance/OPEN_SOURCE_PLAN.md",
+        "docs/governance/CONTRIBUTOR_VISIBILITY_PLAN.md",
         "docs/PUBLISHING.md",
         "CODE_OF_CONDUCT.md",
         "CITATION.cff",
@@ -178,7 +178,7 @@ def check_readme(result: Result) -> None:
         # Doc links must also exist in zh-CN (China-first readers land here)
         "docs/SKILL_ATTENTION_HUD.md",
         "docs/MCP_SERVER.md",
-        "docs/PROJECT_PLAN.md",
+        "docs/governance/PROJECT_PLAN.md",
         "CHANGELOG.md",
         "CONTRIBUTING.md",
     ]
@@ -199,12 +199,12 @@ def check_readme(result: Result) -> None:
 def check_docs(result: Result) -> None:
     evidence = read("docs/EVIDENCE_MODEL.md")
     faq = read("docs/FAQ.md")
-    open_source = read("docs/OPEN_SOURCE_PLAN.md")
-    project_plan = read("docs/PROJECT_PLAN.md")
-    operating_rules = read("docs/OPERATING_RULES.md")
-    quality = read("docs/QUALITY_BAR.md")
+    open_source = read("docs/governance/OPEN_SOURCE_PLAN.md")
+    project_plan = read("docs/governance/PROJECT_PLAN.md")
+    operating_rules = read("docs/governance/OPERATING_RULES.md")
+    quality = read("docs/governance/QUALITY_BAR.md")
     deepseek_roadmap = read("docs/DEEPSEEK_ROADMAP.md")
-    visibility = read("docs/CONTRIBUTOR_VISIBILITY_PLAN.md")
+    visibility = read("docs/governance/CONTRIBUTOR_VISIBILITY_PLAN.md")
     result.check("Static rule evidence" in evidence, "evidence model explains static evidence")
     result.check("Black-box behavior evidence" in evidence, "evidence model explains black-box evidence")
     result.check("Local activation evidence" in evidence, "evidence model explains local activation evidence")

@@ -10,7 +10,7 @@ Usage:
     python scripts/discrim_table.py --skip-llm    # if no API key
 
 Output:
-    docs/v03_discrim_report.md  (table + per-case analysis + G3 verdict)
+    docs/archive/v0.3/discrim_report.md  (table + per-case analysis + G3 verdict)
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from stateprobe.models import Axis
 
 
 EXAMPLES_DIR = REPO_ROOT / "examples"
-DEFAULT_OUT = REPO_ROOT / "docs" / "v03_discrim_report.md"
+DEFAULT_OUT = REPO_ROOT / "docs" / "archive" / "v0.3" / "discrim_report.md"
 DEFAULT_VECTORS = REPO_ROOT / "lab_vectors" / "r1_distill_1.5b_v1.pt"
 
 # G3 thresholds
@@ -313,7 +313,7 @@ def render_table(prompts, static_results, llm_results, lab_results) -> str:
         lines.append(
             f"❌ **FAIL**：仅发现 {n} 个分歧 case，未达到 ≥ {MIN_DIVERGENCE_CASES} 阈值。\n\n"
         )
-        lines.append("**下一步选项**（参考 TECHNICAL_v03.md §8）：\n\n")
+        lines.append("**下一步选项**（参考 docs/archive/v0.3/TECHNICAL.md §8）：\n\n")
         lines.append("1. 换 layer：当前是 -1（最后一层），试 -8 或 -16（中间层）\n")
         lines.append("2. 重设计 contrastive pairs：当前 pairs 可能太工程化\n")
         lines.append("3. 承认 Persona Vectors 在 1.5B distilled 上不够强，降级为研究品\n")

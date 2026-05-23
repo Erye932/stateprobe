@@ -10,7 +10,7 @@
 
 ## 1. Problem
 
-The v0.2.0.dev0 implementation introduced an `Engine` abstraction with two interchangeable engines (`StaticEngine`, `LLMJudgeEngine`) selected via `--engine static|llm`. The acceptance stress test ([`v02_acceptance_review.md`](v02_acceptance_review.md)) revealed three structural defects:
+The v0.2.0.dev0 implementation introduced an `Engine` abstraction with two interchangeable engines (`StaticEngine`, `LLMJudgeEngine`) selected via `--engine static|llm`. The acceptance stress test ([`v02_acceptance_review.md`](../archive/v0.2/acceptance_review.md)) revealed three structural defects:
 
 1. **Lost coverage**: Each engine has blind spots the other catches. Switching means choosing one set of blind spots.
    - Static catches `请请请请...全面深入` (structural + keyword attacks); LLM scored its sycophancy 0%.

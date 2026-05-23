@@ -292,7 +292,7 @@ def main():
             out(f"  - {failure}")
 
     # Write UTF-8 file at the end so we can review without GBK issues.
-    out_path = Path("docs/v02_stress_report.txt")
+    out_path = Path("docs/archive/v0.2/stress_report.txt")
     out_path.parent.mkdir(exist_ok=True)
     out_path.write_text(OUTPUT.getvalue(), encoding="utf-8")
     sys.stdout.buffer.write(

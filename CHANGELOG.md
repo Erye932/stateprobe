@@ -7,7 +7,7 @@ All notable changes to StateProbe will be documented in this file.
 This release adds a **third evidence layer** to the v0.2 hybrid pipeline:
 hidden-state activation projection on DeepSeek-R1-Distill-Qwen-1.5B using
 **Persona Vectors** (Anthropic arXiv:2507.21509). See
-`docs/ADR_010_lab_contributor.md` for the architectural decision.
+`docs/adr/010-lab-contributor.md` for the architectural decision.
 
 ### Added
 
@@ -117,8 +117,8 @@ hidden-state activation projection on DeepSeek-R1-Distill-Qwen-1.5B using
 - Doc/code drift on `MIN_LAB_CONFIDENCE` resolved: the Day 4 calibration
   outcome (0.10, with a sigmoid-mapped per-source confidence
   `sigmoid(10·(|raw| - 0.15))`) is now consistently reflected across
-  `CHANGELOG.md`, `docs/TECHNICAL_v03.md` §3 / §6.4, `docs/ACCEPTANCE_v03.md`,
-  `docs/EXECUTION_v03.md`, and `scripts/diagnose_lab_projections.py`.
+  `CHANGELOG.md`, `docs/archive/v0.3/TECHNICAL.md` §3 / §6.4, `docs/archive/v0.3/ACCEPTANCE.md`,
+  `docs/archive/v0.3/EXECUTION.md`, and `scripts/diagnose_lab_projections.py`.
 - **Skill — mixed positive/negative clauses**: `重点是 X，不要 Y` 形式的句子
   之前会被整体识别为单一 `must_not`，导致 `小男孩 / 手机 / 沉浸感` 这类
   应当是 `must_show / can_imply` 的元素被错误归类到 `must_not_show`。
@@ -166,11 +166,11 @@ hidden-state activation projection on DeepSeek-R1-Distill-Qwen-1.5B using
 - `docs/MCP_SERVER.md`: MCP setup and preview-first activation contract.
 - `docs/ENTERPRISE_RUNTIME_PROBE.md`: boundary document for the future
   model-internal Runtime Probe line.
-- `docs/ADR_010_lab_contributor.md` (Proposed): architectural decision record.
-- `docs/EXECUTION_v03.md`: day-by-day implementation playbook.
-- `docs/PROJECT_v03.md`: external-facing v0.3 release notes.
-- `docs/TECHNICAL_v03.md`: algorithm, interface, performance, and risk register.
-- `docs/ACCEPTANCE_v03.md`: 7 hard gates (G0-G6 required, G7 stretch).
+- `docs/adr/010-lab-contributor.md` (Proposed): architectural decision record.
+- `docs/archive/v0.3/EXECUTION.md`: day-by-day implementation playbook.
+- `docs/archive/v0.3/PROJECT.md`: external-facing v0.3 release notes.
+- `docs/archive/v0.3/TECHNICAL.md`: algorithm, interface, performance, and risk register.
+- `docs/archive/v0.3/ACCEPTANCE.md`: 7 hard gates (G0-G6 required, G7 stretch).
 
 ### Known limitations
 
@@ -186,7 +186,7 @@ hidden-state activation projection on DeepSeek-R1-Distill-Qwen-1.5B using
 This release replaces the v0.2.0.dev0 either-or `--engine` model with a
 **hybrid evidence pipeline** (ADR_009). Static rules are always-on; the LLM
 judge is now an opt-in *additional layer* whose evidence merges with the
-regex layer in the same per-axis pool. See `docs/ADR_009_hybrid_engine.md`
+regex layer in the same per-axis pool. See `docs/adr/009-hybrid-engine.md`
 for the full rationale.
 
 ### Added
@@ -253,12 +253,12 @@ for the full rationale.
 
 ### Documentation
 
-- `docs/ADR_009_hybrid_engine.md`: full architectural decision record.
+- `docs/adr/009-hybrid-engine.md`: full architectural decision record.
 - `docs/DEVELOPMENT.md`: contributor-facing development guide.
-- `docs/RUNBOOK.md`: operations / release / platform-publishing SOP.
-- `docs/v02_acceptance_review.md`: stress-test findings that drove this
+- `docs/governance/RUNBOOK.md`: operations / release / platform-publishing SOP.
+- `docs/archive/v0.2/acceptance_review.md`: stress-test findings that drove this
   release.
-- `docs/v02_stress_report.txt`: regenerated stress-test output (all
+- `docs/archive/v0.2/stress_report.txt`: regenerated stress-test output (all
   assertions PASS).
 
 ## 0.1.0 - Unreleased

@@ -7,7 +7,7 @@ direction vectors (Persona Vectors method, Anthropic arXiv:2507.21509).
 Compared to LLMJudgeContributor:
 - No API call. Runs locally on GPU.
 - Confidence is a sigmoid-calibrated mapping of cosine-projection magnitude
-  (see _confidence_from_raw + TECHNICAL_v03.md §6.4 for the calibration
+  (see _confidence_from_raw + docs/archive/v0.3/TECHNICAL.md §6.4 for the calibration
   rationale), not a self-reported number from an LLM.
 - Initialization is expensive (loads transformer model, ~10-30s). The
   contributor is designed to be created once per process and reused.
@@ -49,7 +49,7 @@ DEFAULT_VECTORS_PATH = "lab_vectors/r1_distill_1.5b_v1.pt"
 
 
 # Sources with |raw_score| below this threshold are silently dropped.
-# Rationale (see TECHNICAL_v03.md §6.4 for the calibration story):
+# Rationale (see docs/archive/v0.3/TECHNICAL.md §6.4 for the calibration story):
 # - For hidden_dim = 1536, two random unit vectors have expected cosine
 #   |c| ~ 1/sqrt(1536) ≈ 0.025 (gaussian-ish around zero).
 # - 0.10 ≈ 4× the random-vector noise floor — a robust signal-to-noise margin.

@@ -3,7 +3,7 @@
 LabContributor 的算法、接口、性能基线、已识别风险与缓解。
 
 来源：`~/.windsurf/plans/v03-lab-contributor-bacc8d.md`
-配套：[ADR_010_lab_contributor.md](ADR_010_lab_contributor.md) · [EXECUTION_v03.md](EXECUTION_v03.md) · [ACCEPTANCE_v03.md](ACCEPTANCE_v03.md)
+配套：[ADR_010](../../adr/010-lab-contributor.md) · [EXECUTION.md](EXECUTION.md) · [ACCEPTANCE.md](ACCEPTANCE.md)
 
 ---
 
@@ -117,7 +117,7 @@ MIN_LAB_CONFIDENCE = 0.10
 """Sources with |raw_score| below this threshold are dropped before
 confidence mapping.
 
-Calibration story (Day 4, see lab.py comments + docs/v03_discrim_report.md):
+Calibration story (Day 4, see lab.py comments + docs/archive/v0.3/discrim_report.md):
 - Random unit vectors in hidden_dim=1536 have expected |cosine| ≈ 1/√1536
   ≈ 0.025; 0.10 ≈ 4× that noise floor.
 - The originally-planned 0.15 dropped meaningful 1.5B-distilled signals
@@ -262,7 +262,7 @@ Persona Vectors 是**推理时方法**，不动模型权重。R1-Distill-Qwen-1.
 
 ## 9. v0.4 路径（Phase 2 stretch outline）
 
-启动条件见 [EXECUTION_v03.md](EXECUTION_v03.md) Phase 2 段。技术层面：
+启动条件见 [EXECUTION.md](EXECUTION.md) Phase 2 段。技术层面：
 
 **目标**：读 DeepSeek-V2-Lite (16B/2A MoE) 的 expert routing 信息，可视化「同一 prompt 在 64 个 expert 里激活了哪几个」。
 
@@ -295,4 +295,4 @@ Persona Vectors 是**推理时方法**，不动模型权重。R1-Distill-Qwen-1.
 1. Anthropic. *Persona Vectors: Monitoring and Controlling Character Traits in Language Models.* arXiv:2507.21509. 2025.
 2. DeepSeek-AI. *DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning.* arXiv:2501.12948. 2025.
 3. DeepSeek-AI. *DeepSeek-V2: A Strong, Economical, and Efficient Mixture-of-Experts Language Model.* arXiv:2405.04434. 2024.
-4. StateProbe ADR_009: Hybrid evidence pipeline. [docs/ADR_009_hybrid_engine.md](ADR_009_hybrid_engine.md).
+4. StateProbe ADR_009: Hybrid evidence pipeline. [docs/adr/009-hybrid-engine.md](../../adr/009-hybrid-engine.md).

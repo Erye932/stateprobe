@@ -10,7 +10,7 @@
 - [ ] 至少跑通一次 `stateprobe skill overlay`
 - [ ] 至少看过 `docs/SKILL_ATTENTION_HUD.md`
 - [ ] 至少看过 `docs/MCP_SERVER.md`
-- [ ] `docs/PROJECT_BRIEF.md` 看得懂
+- [ ] `docs/governance/PROJECT_BRIEF.md` 看得懂
 - [ ] `docs/DEMO_WALKTHROUGH.md` 的 3 个 demo 看得懂
 - [ ] 至少跑通一个 `stateprobe check` demo
 - [ ] 至少生成一次 HTML report

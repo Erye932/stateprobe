@@ -60,11 +60,11 @@ Record every significant project decision here. Each entry should explain what w
 
 **Decision**: v0.2 evidence layer combines static rules and LLM judge **additively** into the same per-axis source pool. Drop the `--engine static|llm` switch. New flag: `--llm-augment` (default off). Static structural + static rules always run; LLM judge contributes additional evidence when enabled and available.
 
-**Why**: Acceptance stress test ([`v02_acceptance_review.md`](v02_acceptance_review.md)) showed each engine has blind spots the other catches: static catches structural attacks (`请请请请...`) and explicit keywords; LLM catches polite implicit pressure («多看到积极的一面»). A switch loses one half. The article's framing ("v0.2 LLM 默认 + static 兜底") was wrong — the right model is layered evidence, not engine replacement.
+**Why**: Acceptance stress test ([`v02_acceptance_review.md`](../archive/v0.2/acceptance_review.md)) showed each engine has blind spots the other catches: static catches structural attacks (`请请请请...`) and explicit keywords; LLM catches polite implicit pressure («多看到积极的一面»). A switch loses one half. The article's framing ("v0.2 LLM 默认 + static 兜底") was wrong — the right model is layered evidence, not engine replacement.
 
 **Rejected**:
 - *Switch (current v0.2.0.dev0 implementation)*: forces user to choose between rule coverage and semantic coverage; LLM mode breaks `is_trivial` because LLM always emits sources for all 8 axes regardless of confidence.
 - *Pure LLM replacement*: misses structural attacks LLM can't see; expensive ($X per check); 200x slower for trivial prompts.
 - *Static-only forever*: leaves the polite-sycophancy gap that motivated v0.2.
 
-**Detail**: [`ADR_009_hybrid_engine.md`](ADR_009_hybrid_engine.md) — full code interface and migration plan.
+**Detail**: [`009-hybrid-engine.md`](009-hybrid-engine.md) — full code interface and migration plan.

@@ -104,7 +104,7 @@ ship as an evidence contributor.
 | ≥ 2 meaningful disagreements | ✅ Ships as full `LabContributor` evidence layer |
 | < 2 disagreements (after 2 redesign attempts) | ✅ Ships as `stateprobe lab-probe` research subcommand only; not in hybrid pipeline |
 
-The downgrade path is documented in `TECHNICAL_v03.md §8`. The reasoning: a
+The downgrade path is documented in `../archive/v0.3/TECHNICAL.md §8`. The reasoning: a
 negative result on Persona Vectors at 1.5B is itself a contribution that
 DeepSeek's interpretability team will find more honest than a fluffy
 positive claim.
@@ -155,9 +155,9 @@ No breaking changes vs v0.2.
 - ADR-009: hybrid evidence pipeline
 - Anthropic, Persona Vectors paper, arXiv:2507.21509
 - Strategic blueprint §1.2, §3.2, §9.2 (offline document)
-- `docs/TECHNICAL_v03.md` — full technical detail
-- `docs/EXECUTION_v03.md` — day-by-day implementation plan
-- `docs/ACCEPTANCE_v03.md` — verification gates G0-G7
+- `docs/archive/v0.3/TECHNICAL.md` — full technical detail
+- `docs/archive/v0.3/EXECUTION.md` — day-by-day implementation plan
+- `docs/archive/v0.3/ACCEPTANCE.md` — verification gates G0-G7
 
 ## Status changelog
 

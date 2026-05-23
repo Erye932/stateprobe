@@ -121,7 +121,7 @@ Axis projections (DeepSeek-R1-Distill-Qwen-1.5B, layer=-1):
 ## 7. 已知限制（诚实告知）
 
 1. **不是真 MoE 读取**：R1-Distill 是稠密 Qwen 模型，读的是 residual stream，不是 expert routing。MoE 读取在 v0.4。
-2. **1.5B 模型的信号强度未知**：Persona Vectors 论文主要在 Llama 70B / Claude 上验证。1.5B distilled 上的信号强度需要 Day 4 区分度验证（见 ACCEPTANCE_v03 G3）。如果 G3 失败，`LabContributor` 可能降级为研究品而非证据层。
+2. **1.5B 模型的信号强度未知**：Persona Vectors 论文主要在 Llama 70B / Claude 上验证。1.5B distilled 上的信号强度需要 Day 4 区分度验证（见 [ACCEPTANCE.md](ACCEPTANCE.md) G3）。如果 G3 失败，`LabContributor` 可能降级为研究品而非证据层。
 3. **CPU fallback 不支持**：单 prompt forward 在 CPU 上 10-20s，太慢，v0.3 要求 CUDA GPU。
 4. **延迟敏感场景不适用**：单 prompt 加 lab 层增加 ~200ms。对实时 prompt 调试 OK，但批量评测需要批处理优化（v0.4 路线）。
 

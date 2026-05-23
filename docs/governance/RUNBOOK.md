@@ -60,7 +60,7 @@ git push
 
 1. 看本周 GitHub star / issue / 流量
 2. 对照 [战略蓝图](C:/Users/Administrator/Desktop/stateprobe_blueprint.md) 第 6 节里程碑表
-3. 写一条到 `docs/PUBLIC_LOG.md`（公开日志）
+3. 写一条到 `docs/governance/PUBLIC_LOG.md`（公开日志）
 4. 调整下周优先级
 
 ---
@@ -255,7 +255,7 @@ Apologies for the noise. Postmortem coming in 24h.
 
 ### 4.3 平台流量来源跟踪
 
-GitHub Insights → Traffic 看 referrer。每周记录到 `docs/PUBLIC_LOG.md`。
+GitHub Insights → Traffic 看 referrer。每周记录到 `docs/governance/PUBLIC_LOG.md`。
 
 格式：
 
@@ -291,7 +291,7 @@ GitHub Insights → Traffic 看 referrer。每周记录到 `docs/PUBLIC_LOG.md`�
 | README 与代码一致 | 所有命令示例能直接跑通 |
 | CHANGELOG 完整 | 当前版本 Added/Changed/Fixed 三类必齐 |
 | 架构文档同步 | docs/ARCHITECTURE.md 与代码组织一致 |
-| ADR 落地 | 每个重大决策都有对应 ADR_NNN_xxx.md 或 DECISIONS.md 条目 |
+| ADR 落地 | 每个重大决策都有对应 docs/adr/NNN-xxx.md 或 docs/adr/decisions.md 条目 |
 | 链接有效 | 所有 markdown 内部链接可点击 |
 
 ### 5.3 测试层验收
@@ -515,10 +515,10 @@ git clone ssh://git@ssh.github.com:443/Erye932/stateprobe.git
 
 出问题翻顺序：
 1. 当前 RUNBOOK.md（你正在看的）
-2. [DEVELOPMENT.md](DEVELOPMENT.md)（开发流程）
+2. [DEVELOPMENT.md](../DEVELOPMENT.md)（开发流程）
 3. [战略蓝图](C:/Users/Administrator/Desktop/stateprobe_blueprint.md)（产品方向）
-4. [ADR_009](ADR_009_hybrid_engine.md)（架构决策）
-5. [DECISIONS.md](DECISIONS.md)（其他决策）
+4. [ADR_009](../adr/009-hybrid-engine.md)（架构决策）
+5. [decisions.md](../adr/decisions.md)（其他决策）
 
 ### 9.3 紧急升级路径
 

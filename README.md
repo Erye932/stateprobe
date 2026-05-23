@@ -7,7 +7,7 @@
 
 > **The attention layer for LLM agents.**
 
-StateProbe lets you steer LLM attention and intercept misaligned outputs before agents ship them. Works with Claude Code, Cursor, Cline, Continue, and any MCP-compatible host.
+Your agent already drifted — wrong focus, stale context, confidently editing files you never asked about. StateProbe catches it **before** the agent ships the answer. Works with **Claude Code**, **Cursor**, **Cline**, **Continue**, and any MCP host.
 
 English | [简体中文](README.zh-CN.md)
 
@@ -103,7 +103,7 @@ Complementary, not competitive. promptfoo / Guardrails check what came out; Stat
 
 ## Architecture
 
-Hybrid evidence pipeline ([ADR_009](docs/ADR_009_hybrid_engine.md)): independent contributors emit confidence-weighted evidence, aggregated into 8 behavior axes. Static rules are always on (zero cost); the LLM and Lab layers are opt-in and stack on top.
+Hybrid evidence pipeline ([ADR_009](docs/adr/009-hybrid-engine.md)): independent contributors emit confidence-weighted evidence, aggregated into 8 behavior axes. Static rules are always on (zero cost); the LLM and Lab layers are opt-in and stack on top.
 
 | Layer | Purpose | Cost |
 | --- | --- | --- |
@@ -126,25 +126,31 @@ DeepSeek-first, not DeepSeek-only — see [DeepSeek roadmap](docs/DEEPSEEK_ROADM
 - **v0.4** — MoE expert routing contributor on DeepSeek-MoE
 - **v0.5** — Named steering vectors; output-time intervention API
 
-Full plan: [project plan](docs/PROJECT_PLAN.md), [open-source plan](docs/OPEN_SOURCE_PLAN.md), [CHANGELOG](CHANGELOG.md).
+Full plan: [project plan](docs/governance/PROJECT_PLAN.md), [open-source plan](docs/governance/OPEN_SOURCE_PLAN.md), [CHANGELOG](CHANGELOG.md).
 
 ## Documentation
 
 - [Skill spec](docs/SKILL_ATTENTION_HUD.md) — attention HUD reference
 - [MCP server](docs/MCP_SERVER.md) — Claude Code / Cursor / Cline / Continue setup
 - [Architecture](docs/ARCHITECTURE.md) — hybrid evidence pipeline
+- [FAQ](docs/FAQ.md) — common objections answered
+
+<details>
+<summary><b>More docs</b> — evidence model, governance, roadmaps, contributor guides</summary>
+
 - [Evidence model](docs/EVIDENCE_MODEL.md) — three-layer evidence boundaries
 - [DeepSeek roadmap](docs/DEEPSEEK_ROADMAP.md) — DeepSeek-first, not DeepSeek-only
-- [FAQ](docs/FAQ.md) — common objections answered
-- [Quality bar](docs/QUALITY_BAR.md) — 10k-star reference benchmark
-- [Operating rules](docs/OPERATING_RULES.md) — visibility-first, engineering-grounded, five gates
-- [Visibility plan](docs/CONTRIBUTOR_VISIBILITY_PLAN.md) — 90-day strategy
-- [Open-source plan](docs/OPEN_SOURCE_PLAN.md) — full launch plan
-- [Project plan](docs/PROJECT_PLAN.md) — north star and version roadmap
+- [Quality bar](docs/governance/QUALITY_BAR.md) — 10k-star reference benchmark
+- [Operating rules](docs/governance/OPERATING_RULES.md) — visibility-first, engineering-grounded, five gates
+- [Visibility plan](docs/governance/CONTRIBUTOR_VISIBILITY_PLAN.md) — 90-day contributor strategy
+- [Open-source plan](docs/governance/OPEN_SOURCE_PLAN.md) — full launch plan
+- [Project plan](docs/governance/PROJECT_PLAN.md) — north star and version roadmap
 - [Publishing](docs/PUBLISHING.md) — release process
 - [CHANGELOG](CHANGELOG.md) / [CITATION](CITATION.cff) / [CODE_OF_CONDUCT](CODE_OF_CONDUCT.md) / [CONTRIBUTING](CONTRIBUTING.md)
 
-中文使用文档（含 China 镜像、PowerShell 编码 fix、完整命令样例）：[README.zh-CN.md](README.zh-CN.md)
+</details>
+
+中文文档（含 China 镜像、PowerShell 编码 fix、完整命令样例）：[README.zh-CN.md](README.zh-CN.md)
 
 ## Contributing
 
