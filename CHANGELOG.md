@@ -2,7 +2,7 @@
 
 All notable changes to StateProbe will be documented in this file.
 
-## 0.3.0 - Unreleased - Activation-projection contributor
+## 0.3.0 - 2026-05-19 - Activation-projection contributor
 
 This release adds a **third evidence layer** to the v0.2 hybrid pipeline:
 hidden-state activation projection on DeepSeek-R1-Distill-Qwen-1.5B using
