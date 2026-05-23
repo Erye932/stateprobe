@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import io
+import sys
+
 import pytest
 from click.testing import CliRunner
 
+import stateprobe.cli as cli_module
 from stateprobe.cli import main
 
 
@@ -33,6 +37,53 @@ def test_check_command_smoke():
     result = runner.invoke(main, ["check", "你是资深专家，请全面分析这个项目"])
     assert result.exit_code == 0
     assert "StateProbe" in result.output
+
+
+class _FakeTextStream(io.TextIOWrapper):
+    def __init__(self, *, encoding: str, errors: str, is_tty: bool):
+        super().__init__(io.BytesIO(), encoding=encoding, errors=errors)
+        self._is_tty = is_tty
+
+    def isatty(self):
+        return self._is_tty
+
+
+def test_windows_encoding_keeps_piped_stream_native_encoding(monkeypatch):
+    stdout = _FakeTextStream(
+        encoding="gbk", errors="surrogateescape", is_tty=False
+    )
+    stderr = _FakeTextStream(
+        encoding="gbk", errors="surrogateescape", is_tty=False
+    )
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(sys, "stdout", stdout)
+    monkeypatch.setattr(sys, "stderr", stderr)
+
+    cli_module._ensure_utf8_windows()
+
+    assert sys.stdout.encoding == "gbk"
+    assert sys.stdout.errors == "replace"
+    assert sys.stderr.encoding == "gbk"
+    assert sys.stderr.errors == "replace"
+
+
+def test_windows_encoding_forces_interactive_stream_utf8(monkeypatch):
+    stdout = _FakeTextStream(
+        encoding="gbk", errors="surrogateescape", is_tty=True
+    )
+    stderr = _FakeTextStream(
+        encoding="gbk", errors="surrogateescape", is_tty=True
+    )
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(sys, "stdout", stdout)
+    monkeypatch.setattr(sys, "stderr", stderr)
+
+    cli_module._ensure_utf8_windows()
+
+    assert sys.stdout.encoding.lower().replace("-", "") == "utf8"
+    assert sys.stdout.errors == "replace"
+    assert sys.stderr.encoding.lower().replace("-", "") == "utf8"
+    assert sys.stderr.errors == "replace"
 
 
 # ---------------------------------------------------------------------------

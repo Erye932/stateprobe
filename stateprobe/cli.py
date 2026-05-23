@@ -51,32 +51,69 @@ def _ensure_utf8_windows() -> None:
 
     This function:
     1. Sets the Windows console output code page to 65001 (UTF-8) via kernel32.
-    2. Wraps sys.stdout/stderr with UTF-8 TextIOWrapper.
+    2. Reconfigures interactive sys.stdout/stderr streams to UTF-8.
 
     Called both at module-level (for Console init) and per-command (safety net).
-    Skips when stdout has no buffer (e.g. Click CliRunner in tests).
+    Skips non-interactive streams so PowerShell pipelines can decode native
+    command output with the expected Windows encoding.
     """
     if sys.platform != "win32":
         return
-    # Step 1: Set Windows console code page to UTF-8
+    stdout_is_tty = _is_interactive_stream(sys.stdout)
+    stderr_is_tty = _is_interactive_stream(sys.stderr)
+    if stdout_is_tty or stderr_is_tty:
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetConsoleOutputCP(65001)
+            ctypes.windll.kernel32.SetConsoleCP(65001)
+        except (AttributeError, OSError):
+            pass
+
+    if stdout_is_tty:
+        _force_utf8_text_stream("stdout")
+    else:
+        _force_replace_errors("stdout")
+    if stderr_is_tty:
+        _force_utf8_text_stream("stderr")
+    else:
+        _force_replace_errors("stderr")
+
+
+def _is_interactive_stream(stream: object) -> bool:
+    isatty = getattr(stream, "isatty", None)
+    if not callable(isatty):
+        return False
     try:
-        import ctypes
-        ctypes.windll.kernel32.SetConsoleOutputCP(65001)
-        ctypes.windll.kernel32.SetConsoleCP(65001)
-    except (AttributeError, OSError):
+        return bool(isatty())
+    except OSError:
+        return False
+
+
+def _force_utf8_text_stream(name: str) -> None:
+    stream = getattr(sys, name)
+    if getattr(stream, "encoding", "").lower().replace("-", "") == "utf8":
+        return
+    try:
+        stream.reconfigure(encoding="utf-8", errors="replace")
+        return
+    except (AttributeError, ValueError):
         pass
-    if not hasattr(sys.stdout, "buffer"):
-        return
-    # Step 2: Wrap stdout/stderr with UTF-8 encoding
-    if getattr(sys.stdout, "encoding", "").lower().replace("-", "") == "utf8":
+    if not hasattr(stream, "buffer"):
         return
     try:
-        sys.stdout = io.TextIOWrapper(
-            sys.stdout.buffer, encoding="utf-8", errors="replace"
+        setattr(
+            sys,
+            name,
+            io.TextIOWrapper(stream.buffer, encoding="utf-8", errors="replace"),
         )
-        sys.stderr = io.TextIOWrapper(
-            sys.stderr.buffer, encoding="utf-8", errors="replace"
-        )
+    except (AttributeError, ValueError):
+        pass
+
+
+def _force_replace_errors(name: str) -> None:
+    stream = getattr(sys, name)
+    try:
+        stream.reconfigure(errors="replace")
     except (AttributeError, ValueError):
         pass
 
@@ -84,7 +121,7 @@ def _ensure_utf8_windows() -> None:
 # Apply UTF-8 fix BEFORE Console init so Rich sees UTF-8 stdout.
 _ensure_utf8_windows()
 
-console = Console(force_terminal=True)
+console = Console(force_terminal=True, legacy_windows=False)
 
 
 # ---------------------------------------------------------------------------

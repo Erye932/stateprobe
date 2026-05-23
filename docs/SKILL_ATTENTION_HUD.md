@@ -116,25 +116,20 @@ Minimal host instruction:
 activation_decision.should_stop 为 true 时，不要输出用户可见内容。
 ```
 
-写完之后跑 `overlay` 时，准备两个文件：
-
-- 一个 `context` 文件：放用户要求
-- 一个 `output` 文件：放 agent 实际输出
-
-仓库里已经有示例文件：
+写完之后跑 `overlay` 时，可以直接传用户要求和 agent 实际输出：
 
 ```bash
 stateprobe skill overlay \
-  --context examples/skill_attention_context.txt \
-  --output examples/skill_attention_output.txt
+  --context-text "核心是让 agent 的注意力可见。不要把格式化当主线。" \
+  --output-text "StateProbe 是一个 prompt 检查器，格式化模板是核心。"
 ```
 
 机器可读 JSON：
 
 ```bash
 stateprobe skill overlay \
-  --context examples/skill_attention_context.txt \
-  --output examples/skill_attention_output.txt \
+  --context-text "核心是让 agent 的注意力可见。不要把格式化当主线。" \
+  --output-text "StateProbe 是一个 prompt 检查器，格式化模板是核心。" \
   --json
 ```
 
@@ -142,8 +137,8 @@ stateprobe skill overlay \
 
 ```bash
 stateprobe skill overlay \
-  --context examples/skill_attention_context.txt \
-  --output examples/skill_attention_output.txt \
+  --context-text "核心是让 agent 的注意力可见。不要把格式化当主线。" \
+  --output-text "StateProbe 是一个 prompt 检查器，格式化模板是核心。" \
   --control-patch
 ```
 

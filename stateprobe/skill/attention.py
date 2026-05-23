@@ -112,7 +112,18 @@ class Requirement:
     marker: Optional[str] = None
 
     def to_dict(self) -> Dict:
-        return asdict(self)
+        return {
+            "text": self.text,
+            "polarity": self.polarity,
+            "keywords": _display_terms_from_text(
+                self.text,
+                self.keywords,
+                self.polarity,
+                limit=5,
+            ),
+            "strength": self.strength,
+            "marker": self.marker,
+        }
 
 
 @dataclass
@@ -137,7 +148,12 @@ class RequirementCoverage:
             "requirement": self.requirement.to_dict(),
             "status": self.status,
             "coverage": self.coverage,
-            "matched_keywords": self.matched_keywords,
+            "matched_keywords": _display_terms_from_text(
+                self.requirement.text,
+                self.matched_keywords,
+                self.requirement.polarity,
+                limit=5,
+            ),
             "notes": self.notes,
         }
 
@@ -488,6 +504,13 @@ VISUAL_FORBIDDEN_MARKERS: Tuple[str, ...] = (
     "游戏UI", "游戏 UI", "UI", "界面", "文字", "字幕", "水印",
 )
 
+DISPLAY_PHRASES_ZH: Tuple[str, ...] = (
+    "注意力仪表盘", "注意力可见", "格式化模板", "前端界面",
+    "游戏画面", "废弃API", "开源项目", "发布说明",
+    "注意力", "格式化", "企业线", "检查器", "主线",
+    "沉浸感", "屏幕", "游戏", "安全", "模板",
+)
+
 # 英文动作词
 ACTION_VERBS_EN: Tuple[str, ...] = (
     "playing", "watching", "listening", "reading", "eating",
@@ -584,6 +607,68 @@ def _extract_keywords(sentence: str) -> List[str]:
         seen.add(k)
         out.append(k)
     return out
+
+
+def _append_unique(items: List[str], value: str) -> None:
+    value = value.strip()
+    if not value or value in items:
+        return
+    if any(value in existing and value != existing for existing in items):
+        return
+    items[:] = [
+        existing for existing in items
+        if not (existing in value and existing != value)
+    ]
+    items.append(value)
+
+
+def _display_terms_from_text(
+    text: str,
+    fallback: List[str],
+    polarity: str = "soft",
+    limit: int = 3,
+) -> List[str]:
+    terms: List[str] = []
+    for phrase in _extract_boundary_candidates(text, polarity):
+        _append_unique(terms, phrase)
+    for phrase in DISPLAY_PHRASES_ZH:
+        if phrase in text:
+            _append_unique(terms, phrase)
+    for word in EN_WORD_RE.findall(text or ""):
+        wl = word.lower()
+        if wl not in STOPWORDS:
+            _append_unique(terms, word)
+    for item in fallback:
+        if re.search(r"[\u4e00-\u9fff]", item):
+            continue
+        _append_unique(terms, item)
+    if terms:
+        return terms[:limit]
+    return fallback[:limit]
+
+
+def _display_label_for_keyword(keyword: str, sentence: str) -> str:
+    candidates = _display_terms_from_text(sentence, [keyword], "soft", limit=8)
+    for item in candidates:
+        if keyword in item or item in keyword:
+            return item
+    if re.search(r"[\u4e00-\u9fff]", keyword):
+        for phrase in DISPLAY_PHRASES_ZH:
+            if phrase in sentence and any(char in phrase for char in keyword):
+                return phrase
+    for item in candidates:
+        if item not in STOPWORDS:
+            return item
+    return keyword
+
+
+def _attention_priority(alignment: str) -> int:
+    return {
+        "off_task": 0,
+        "aligned": 1,
+        "partial": 2,
+        "violation": 3,
+    }.get(alignment, 0)
 
 
 def _detect_marker(sentence: str) -> Tuple[Optional[str], str]:
@@ -775,13 +860,16 @@ def _core_focus(output: str) -> List[str]:
         return []
     focus: List[str] = [sentences[0][:80]]
     counts: Dict[str, int] = {}
+    sent_index: Dict[str, str] = {}
     for s in sentences:
         for k in set(_extract_keywords(s)):
             counts[k] = counts.get(k, 0) + 1
+            sent_index.setdefault(k, s)
     if counts:
         top_kw, top_n = max(counts.items(), key=lambda kv: kv[1])
         if top_n >= 2:
-            focus.append(f"主要围绕「{top_kw}」展开")
+            label = _display_label_for_keyword(top_kw, sent_index.get(top_kw, ""))
+            focus.append(f"主要围绕「{label}」展开")
     return focus
 
 
@@ -812,7 +900,12 @@ def _build_intent_map(reqs: List[Requirement]) -> List[IntentSignal]:
                 label=r.text,
                 priority=priority,
                 weight=round(r.strength / total, 3),
-                evidence=r.keywords[:3],
+                evidence=_display_terms_from_text(
+                    r.text,
+                    r.keywords,
+                    r.polarity,
+                    limit=3,
+                ),
             )
         )
     return out
@@ -842,13 +935,28 @@ def _build_attention_map(
             counts[k] = counts.get(k, 0) + 1
             if k not in sent_index:
                 sent_index[k] = s
+    for phrase in DISPLAY_PHRASES_ZH:
+        if phrase not in agent_output:
+            continue
+        counts[phrase] = max(counts.get(phrase, 0), agent_output.count(phrase))
+        for s in sentences:
+            if phrase in s:
+                sent_index.setdefault(phrase, s)
+                break
 
     items = [(k, n) for k, n in counts.items() if n >= min_count]
     if not items:
         # 退化：实在没人重复出现，就取出现过的 top-N 也比空列表好。
         items = list(counts.items())
+    elif len(items) < top_n:
+        seen_item_keys = {k for k, _ in items}
+        for k, n in counts.items():
+            if k not in seen_item_keys:
+                items.append((k, n))
+                seen_item_keys.add(k)
+            if len(items) >= top_n * 3:
+                break
     items.sort(key=lambda kv: -kv[1])
-    items = items[:top_n]
     if not items:
         return []
 
@@ -869,26 +977,52 @@ def _build_attention_map(
 
     total = sum(n for _, n in items) or 1
     out: List[AttentionSignal] = []
+    by_label: Dict[str, AttentionSignal] = {}
     for kw, n in items:
         weight = round(n / total, 3)
         ev_sentence = sent_index.get(kw, "")
         evidence = [ev_sentence[:80]] if ev_sentence else []
-        if kw in must_not_kws:
+        label = _display_label_for_keyword(kw, ev_sentence)
+        must_not_match = next(
+            (k for k in must_not_kws if k in kw or kw in k),
+            None,
+        )
+        must_match = next((k for k in must_kws if k in kw or kw in k), None)
+        if must_not_match is not None:
             alignment = "violation"
-        elif kw in must_kws:
-            cov = must_kws[kw]
+        elif must_match is not None:
+            cov = must_kws[must_match]
             alignment = "aligned" if cov.status == "reflected" else "partial"
         else:
             alignment = "off_task"
-        out.append(
-            AttentionSignal(
-                label=kw,
-                weight=weight,
-                alignment=alignment,
-                evidence=evidence,
-            )
+        signal_key = label
+        existing = by_label.get(signal_key)
+        if (
+            existing is not None
+            and existing.alignment != alignment
+            and "off_task" in {existing.alignment, alignment}
+        ):
+            signal_key = f"{label}:{alignment}"
+            existing = by_label.get(signal_key)
+        signal = AttentionSignal(
+            label=label,
+            weight=weight,
+            alignment=alignment,
+            evidence=evidence,
         )
-    return out
+        if existing is None:
+            by_label[signal_key] = signal
+            continue
+        existing.weight = round(existing.weight + weight, 3)
+        if _attention_priority(alignment) > _attention_priority(existing.alignment):
+            existing.alignment = alignment
+        if evidence and evidence[0] not in existing.evidence:
+            existing.evidence.extend(evidence)
+    out = sorted(
+        by_label.values(),
+        key=lambda sig: (-sig.weight, -_attention_priority(sig.alignment), sig.label),
+    )
+    return out[:top_n]
 
 
 def _build_attention_gaps(

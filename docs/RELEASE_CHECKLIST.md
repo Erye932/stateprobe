@@ -49,13 +49,17 @@
 - [ ] 推送到远程仓库
 - [ ] 检查 GitHub 页面 README 渲染正常
 
-## 5. PyPI 发布（可选）
+## 5. PyPI 发布
 
 - [ ] 安装 build 工具：`python -m pip install build twine`
+- [ ] 清理旧构建产物：`dist/`、`build/`、`stateprobe.egg-info/`
 - [ ] 构建包：`python -m build`
 - [ ] 检查包：`python -m twine check dist/*`
-- [ ] 先发 TestPyPI
-- [ ] 再发正式 PyPI
+- [ ] README 图片使用 `https://` 绝对地址，PyPI 页面不会破图
+- [ ] README 快速命令在干净目录、只安装 wheel 后也能跑
+- [ ] 推送版本 tag：`git tag v0.x.y && git push origin v0.x.y`
+- [ ] GitHub Actions 的 `Publish to PyPI` 工作流成功
+- [ ] `pip install stateprobe` 能安装最新版本
 
 ## 6. 暂时不做的事
 

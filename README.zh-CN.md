@@ -1,7 +1,7 @@
 # StateProbe
 
 [![PyPI](https://img.shields.io/pypi/v/stateprobe.svg)](https://pypi.org/project/stateprobe/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Erye932/stateprobe/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
 [![Tests](https://github.com/Erye932/stateprobe/actions/workflows/ci.yml/badge.svg)](https://github.com/Erye932/stateprobe/actions/workflows/ci.yml)
 
@@ -9,7 +9,13 @@
 
 StateProbe 让你在 agent 把答案甩出去之前，**直接干预模型注意力**——看清它要谈什么、用户真正要什么是否对得上，决定继续、重写、追问还是切断旧上下文。无缝接入 Claude Code、Cursor、Cline、Continue，以及任何 MCP host。
 
-[English](README.md) | 简体中文
+闭源 agent 上，这是从文本推断出来的高速任务层注意力；开源模型会解锁可选的 Lab / 未来 Runtime Probe 路线，继续往 activations 和 vectors 深挖。
+
+[English](https://github.com/Erye932/stateprobe/blob/main/README.md) | 简体中文
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Erye932/stateprobe/main/docs/images/skill_preview_demo.svg" alt="StateProbe 在 agent 输出前拦住旧上下文污染" width="900">
+</p>
 
 ---
 
@@ -83,8 +89,8 @@ agent 答完后——复盘有没有跑偏：
 
 ```bash
 stateprobe skill overlay \
-  --context examples/skill_attention_context.txt \
-  --output examples/skill_attention_output.txt
+  --context-text "重点是安全，不要推荐废弃 API。" \
+  --output-text "这段回答首先推荐了一个废弃 API。"
 ```
 
 交互模式：
@@ -112,17 +118,17 @@ stateprobe demo
 
 `stateprobe skill overlay` 返回 `interrupt_level`（`ok` / `watch` / `interrupt`）+ `attention_gaps` + `control_levers`，告诉你下一轮怎么纠。
 
-完整 schema：[Skill spec](docs/SKILL_ATTENTION_HUD.md)、[MCP server](docs/MCP_SERVER.md)。
+完整 schema：[Skill spec](https://github.com/Erye932/stateprobe/blob/main/docs/SKILL_ATTENTION_HUD.md)、[MCP server](https://github.com/Erye932/stateprobe/blob/main/docs/MCP_SERVER.md)。
 
 ## 两条产品线
 
 | 线 | 是什么 | 状态 |
 | --- | --- | --- |
-| **Skill — Agent Attention HUD** | 外部控制层。文本层 task attention。闭源 / 开源模型都能用。 | ✅ 已可用 |
-| **Lab — 激活投影** | 在开源 DeepSeek-R1-Distill-Qwen 上把 prompt 投影到 Persona Vectors。可选启用。 | ✅ 已可用 |
-| **Enterprise — Runtime Probe** | 长期方向：开源模型的 hidden states / router traces / expert routing。 | 🛠 占位中，未实现 |
+| **Skill — Agent Attention HUD** | 已交付的外部控制层。文本到文本的任务层注意力：输出前 preview，输出后 overlay，给下一轮 control levers。闭源 / 开源模型都能用。 | ✅ 已交付 |
+| **Lab — 激活投影** | 开源权重实验线。在 DeepSeek-R1-Distill-Qwen 上把 prompt activations 投影到 Persona Vectors。需要本地模型访问。 | ✅ 可用 / 实验性 |
+| **Enterprise — Runtime Probe** | 未来生产线：开源模型的 hidden states、router traces、expert routing、output-state report 和 operator controls。 | 🛠 占位中，未实现 |
 
-**边界**：闭源 API（OpenAI、Claude）拿不到 hidden states——对它们，StateProbe 只跑文本层 Skill。开源模型（DeepSeek、Qwen、Llama）才解锁 Lab 层。
+**边界**：Skill HUD 不声称神经可解释性；它是从文本里重建并控制任务层注意力。闭源 API（OpenAI、Claude）拿不到 hidden states——对它们，StateProbe 只跑文本层 Skill。开源模型（DeepSeek、Qwen、Llama）才解锁今天的 Lab 路线和未来 Runtime Probe。
 
 > 一句话区分：**闭源模型上是望气；开源模型上能分金**。
 
@@ -152,7 +158,7 @@ stateprobe demo
 
 ## 架构
 
-v0.2 起 StateProbe 采用 **hybrid evidence 架构**（[ADR_009](docs/adr/009-hybrid-engine.md)）：多个证据贡献者并行观察 prompt，各自发出带 confidence 的证据，统一聚合到 8 个轴的读数。
+v0.2 起 StateProbe 采用 **hybrid evidence 架构**（[ADR_009](https://github.com/Erye932/stateprobe/blob/main/docs/adr/009-hybrid-engine.md)）：多个证据贡献者并行观察 prompt，各自发出带 confidence 的证据，统一聚合到 8 个轴的读数。
 
 | 层 | 作用 | 代价 |
 | --- | --- | --- |
@@ -164,7 +170,7 @@ v0.2 起 StateProbe 采用 **hybrid evidence 架构**（[ADR_009](docs/adr/009-h
 - Anthropic — [Persona Vectors: Monitoring and Controlling Character Traits in Language Models](https://arxiv.org/abs/2507.21509)
 - DeepSeek-AI — [DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning](https://arxiv.org/abs/2501.12948)
 
-DeepSeek-first, not DeepSeek-only — 详见 [docs/DEEPSEEK_ROADMAP.md](docs/DEEPSEEK_ROADMAP.md)。
+DeepSeek-first, not DeepSeek-only — 详见 [docs/DEEPSEEK_ROADMAP.md](https://github.com/Erye932/stateprobe/blob/main/docs/DEEPSEEK_ROADMAP.md)。
 
 ## 8 个行为轴
 
@@ -188,7 +194,7 @@ DeepSeek-first, not DeepSeek-only — 详见 [docs/DEEPSEEK_ROADMAP.md](docs/DEE
 - **v0.4** — DeepSeek-MoE expert routing contributor
 - **v0.5** — 命名情绪向量库；输出时干预 API
 
-完整版本历史：[CHANGELOG](CHANGELOG.md)。
+完整版本历史：[CHANGELOG](https://github.com/Erye932/stateprobe/blob/main/CHANGELOG.md)。
 
 ## 一个延展方向（写给走到这里的你）
 
@@ -200,15 +206,15 @@ DeepSeek-first, not DeepSeek-only — 详见 [docs/DEEPSEEK_ROADMAP.md](docs/DEE
 
 ## 文档
 
-- [Skill spec](docs/SKILL_ATTENTION_HUD.md) — attention HUD 规格
-- [MCP server](docs/MCP_SERVER.md) — Claude Code / Cursor / Cline 接入
-- [Architecture](docs/ARCHITECTURE.md) — hybrid evidence pipeline
-- [Evidence model](docs/EVIDENCE_MODEL.md) — 三层证据边界（static / black-box / local activation）
-- [DeepSeek roadmap](docs/DEEPSEEK_ROADMAP.md) — DeepSeek-first, not DeepSeek-only
-- [FAQ](docs/FAQ.md) — 常见质疑（含闭源 API 拿不到 hidden states 的边界）
-- [Architecture decisions](docs/adr/) — ADR： hybrid pipeline / lab contributor
-- [Publishing](docs/PUBLISHING.md) — 安全发布流程
-- [CHANGELOG](CHANGELOG.md) / [CITATION](CITATION.cff) / [CODE_OF_CONDUCT](CODE_OF_CONDUCT.md) / [CONTRIBUTING](CONTRIBUTING.md)
+- [Skill spec](https://github.com/Erye932/stateprobe/blob/main/docs/SKILL_ATTENTION_HUD.md) — attention HUD 规格
+- [MCP server](https://github.com/Erye932/stateprobe/blob/main/docs/MCP_SERVER.md) — Claude Code / Cursor / Cline 接入
+- [Architecture](https://github.com/Erye932/stateprobe/blob/main/docs/ARCHITECTURE.md) — hybrid evidence pipeline
+- [Evidence model](https://github.com/Erye932/stateprobe/blob/main/docs/EVIDENCE_MODEL.md) — 三层证据边界（static / black-box / local activation）
+- [DeepSeek roadmap](https://github.com/Erye932/stateprobe/blob/main/docs/DEEPSEEK_ROADMAP.md) — DeepSeek-first, not DeepSeek-only
+- [FAQ](https://github.com/Erye932/stateprobe/blob/main/docs/FAQ.md) — 常见质疑（含闭源 API 拿不到 hidden states 的边界）
+- [Architecture decisions](https://github.com/Erye932/stateprobe/tree/main/docs/adr) — ADR： hybrid pipeline / lab contributor
+- [Publishing](https://github.com/Erye932/stateprobe/blob/main/docs/PUBLISHING.md) — 安全发布流程
+- [CHANGELOG](https://github.com/Erye932/stateprobe/blob/main/CHANGELOG.md) / [CITATION](https://github.com/Erye932/stateprobe/blob/main/CITATION.cff) / [CODE_OF_CONDUCT](https://github.com/Erye932/stateprobe/blob/main/CODE_OF_CONDUCT.md) / [CONTRIBUTING](https://github.com/Erye932/stateprobe/blob/main/CONTRIBUTING.md)
 
 ## 贡献
 
@@ -219,7 +225,7 @@ DeepSeek-first, not DeepSeek-only — 详见 [docs/DEEPSEEK_ROADMAP.md](docs/DEE
 
 欢迎提 issue 或 PR。每条规则需要附：模式 / 影响的轴 / 方向 / 权重 / **机制解释** / **论文引用**。
 
-贡献前请先看 [CONTRIBUTING.md](CONTRIBUTING.md)，并运行：
+贡献前请先看 [CONTRIBUTING.md](https://github.com/Erye932/stateprobe/blob/main/CONTRIBUTING.md)，并运行：
 
 ```bash
 python scripts/acceptance_check.py
@@ -227,7 +233,7 @@ python scripts/acceptance_check.py
 
 ## License
 
-MIT — 见 [LICENSE](LICENSE)。
+MIT — 见 [LICENSE](https://github.com/Erye932/stateprobe/blob/main/LICENSE)。
 
 ---
 

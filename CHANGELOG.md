@@ -2,6 +2,24 @@
 
 All notable changes to StateProbe will be documented in this file.
 
+## 0.3.1 - 2026-05-23 - Windows CLI encoding and launch demo polish
+
+### Fixed
+
+- Windows CLI output now handles interactive terminals and PowerShell pipelines
+  separately. Interactive Windows terminals are forced to UTF-8; piped output
+  keeps the native encoding with replacement for unsupported decorative
+  glyphs. This fixes mojibake in `stateprobe --help` and prevents
+  `stateprobe skill preview` from crashing on GBK-only pipes.
+
+### Changed
+
+- Rich rendering disables legacy Windows rendering to avoid encoding failures
+  when Skill preview panels contain Unicode labels and box drawing.
+- The English and Chinese READMEs now show a first-screen Skill preview image
+  that demonstrates StateProbe cutting stale-context contamination before an
+  agent answers.
+
 ## 0.3.0 - 2026-05-19 - Activation-projection contributor
 
 This release adds a **third evidence layer** to the v0.2 hybrid pipeline:

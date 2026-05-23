@@ -1,6 +1,6 @@
 # Publishing StateProbe
 
-This guide describes the safe path from local project to public GitHub repository and, later, PyPI.
+This guide describes the safe path from local project to public GitHub repository and PyPI.
 
 Current GitHub launch focus:
 
@@ -80,14 +80,31 @@ git commit -m "Initial StateProbe open-source release"
 - `docs/ENTERPRISE_RUNTIME_PROBE.md` does not imply implementation is shipped.
 - Release checklist is reviewed.
 
-## PyPI publishing later
+## PyPI publishing
 
-PyPI publishing is optional and should happen after the GitHub release is stable.
+PyPI is part of the public install path. The release workflow publishes from
+version tags through PyPI Trusted Publisher.
 
 ```bash
-python -m pip install build twine
+python -c "import shutil, pathlib; [shutil.rmtree(p, ignore_errors=True) for p in [pathlib.Path('dist'), pathlib.Path('build'), pathlib.Path('stateprobe.egg-info')]]"
 python -m build
 python -m twine check dist/*
 ```
 
-Do not publish to PyPI until the package name, README, URLs, and version are final.
+Before pushing a tag, confirm:
+
+- `pyproject.toml`, `stateprobe/__init__.py`, and `CHANGELOG.md` use the same version.
+- README images use absolute `https://` URLs so the PyPI project page renders correctly.
+- README quickstart commands work after `pip install stateprobe` from a clean directory.
+- `python scripts/acceptance_check.py` finishes with zero failures and zero warnings.
+
+To publish:
+
+```bash
+git tag v0.x.y
+git push origin v0.x.y
+```
+
+The `.github/workflows/publish.yml` workflow builds the package, runs
+`twine check`, and publishes to PyPI with OIDC. Do not use long-lived PyPI API
+tokens unless Trusted Publisher is unavailable.

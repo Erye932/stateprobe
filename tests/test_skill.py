@@ -574,6 +574,53 @@ def test_phase12_preview_decomposes_visual_boundaries_and_literalization():
     )
 
 
+def test_skill_json_does_not_expose_chinese_ngram_noise_in_debug_maps():
+    preview = preview_attention(
+        "小男孩拿着手机打游戏，重点是小男孩的沉浸感。",
+        "我准备画一个小男孩拿着手机，手机屏幕上显示游戏画面。",
+    )
+
+    payload = preview.to_dict()
+    rendered = json.dumps(payload, ensure_ascii=False)
+    bad_fragments = {
+        "点是小",
+        "是小男",
+        "着手机",
+        "示游戏",
+        "画一",
+        "个小男",
+        "男孩拿",
+        "孩拿着",
+    }
+
+    assert not (bad_fragments & set(rendered.split('"')))
+    labels = {item["label"] for item in payload["planned_attention_map"]}
+    assert "小男孩" in labels
+    assert "手机" in labels or "游戏画面" in labels
+
+
+def test_overlay_json_does_not_expose_chinese_ngram_noise_in_keywords():
+    hud = analyze_attention(
+        "小男孩拿着手机打游戏，重点是小男孩的沉浸感。",
+        "我准备画一个小男孩拿着手机，手机屏幕上显示游戏画面。",
+    )
+
+    payload = hud.to_dict()
+    rendered = json.dumps(payload, ensure_ascii=False)
+    bad_fragments = {
+        "点是小",
+        "是小男",
+        "着手机",
+        "示游戏",
+        "画一",
+        "个小男",
+        "男孩拿",
+        "孩拿着",
+    }
+
+    assert not (bad_fragments & set(rendered.split('"')))
+
+
 def test_phase12_preview_splits_mixed_positive_and_negative_clauses():
     preview = preview_attention(
         "小男孩拿着手机打游戏，重点是沉浸感，不要出现游戏UI。",

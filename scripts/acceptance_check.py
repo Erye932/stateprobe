@@ -77,6 +77,7 @@ def check_required_files(result: Result) -> None:
         "docs/EVIDENCE_MODEL.md",
         "docs/DEEPSEEK_ROADMAP.md",
         "docs/FAQ.md",
+        "docs/images/skill_preview_demo.svg",
         "docs/PUBLISHING.md",
         "docs/RELEASE_CHECKLIST.md",
         "demos/README.md",
@@ -122,6 +123,7 @@ def check_readme(result: Result) -> None:
         "OpenAI/Claude 物理上读不到",
         # Sibling link to mirror
         "README.zh-CN.md",
+        "docs/images/skill_preview_demo.svg",
         # Architecture pillars
         "Static Mode",
         "Black-box Eval",
@@ -141,6 +143,18 @@ def check_readme(result: Result) -> None:
     ]
     for phrase in en_required:
         result.check(phrase in en_text, f"README.md contains: {phrase}")
+    raw_demo_image = (
+        "https://raw.githubusercontent.com/Erye932/stateprobe/main/"
+        "docs/images/skill_preview_demo.svg"
+    )
+    result.check(
+        raw_demo_image in en_text,
+        "README.md uses PyPI-safe absolute demo image URL",
+    )
+    result.check(
+        "examples/skill_attention" not in en_text,
+        "README.md 30-second Skill demo is copy-paste runnable after pip install",
+    )
 
     en_first_screen = "\n".join(en_text.splitlines()[:40])
     result.check(
@@ -162,6 +176,7 @@ def check_readme(result: Result) -> None:
     # Chinese mirror: comprehensive Chinese narrative + China install flow
     zh_required = [
         "LLM agent 的注意力控制层",
+        "docs/images/skill_preview_demo.svg",
         "30 秒 demo",
         "PowerShell",
         "DeepSeek-first, not DeepSeek-only",
@@ -173,6 +188,14 @@ def check_readme(result: Result) -> None:
     ]
     for phrase in zh_required:
         result.check(phrase in zh_text, f"README.zh-CN.md contains: {phrase}")
+    result.check(
+        raw_demo_image in zh_text,
+        "README.zh-CN.md uses PyPI-safe absolute demo image URL",
+    )
+    result.check(
+        "examples/skill_attention" not in zh_text,
+        "README.zh-CN.md 30-second Skill demo is copy-paste runnable after pip install",
+    )
 
     zh_boundary_phrases = [
         "闭源 API 拿不到 hidden states",
@@ -182,6 +205,11 @@ def check_readme(result: Result) -> None:
     result.check(
         any(p in zh_text for p in zh_boundary_phrases),
         "README.zh-CN.md states closed-source-internals boundary",
+    )
+    skill_doc = read("docs/SKILL_ATTENTION_HUD.md")
+    result.check(
+        "examples/skill_attention" not in skill_doc,
+        "Skill HUD docs avoid clone-only example paths in quickstart commands",
     )
 
 
@@ -209,6 +237,9 @@ def check_docs(result: Result) -> None:
     result.check("0.1.0 - Unreleased" in changelog, "changelog has unreleased version section")
     result.check("default `stateprobe check` command does not call external APIs" in security, "security policy states local-first default")
     result.check("revoke it immediately" in publishing, "publishing guide covers leaked token response")
+    result.check("PyPI publishing later" not in publishing, "publishing guide does not describe PyPI as a future-only path")
+    result.check("README quickstart commands work after `pip install stateprobe`" in publishing, "publishing guide protects clean-install quickstarts")
+    result.check("PyPI Trusted Publisher" in publishing, "publishing guide documents Trusted Publisher release path")
     result.check("Expected behavior" in code_of_conduct, "code of conduct defines expected behavior")
     result.check("repository-code: \"https://github.com/Erye932/stateprobe\"" in citation, "citation file points to GitHub repository")
 
@@ -279,6 +310,40 @@ def check_cli_and_tests(result: Result) -> None:
         ]
     )
     result.check(code == 0, "Demo 0 check command runs", output[-1000:])
+    code, output = run_command([
+        sys.executable,
+        "-m",
+        "stateprobe.cli",
+        "skill",
+        "overlay",
+        "--context-text",
+        "重点是安全，不要推荐废弃 API。",
+        "--output-text",
+        "这段回答首先推荐了一个废弃 API。",
+        "--json",
+    ])
+    result.check(
+        code == 0 and "interrupt_level" in output,
+        "README.zh-CN Skill overlay demo runs without repository example files",
+        output[-1000:],
+    )
+    code, output = run_command([
+        sys.executable,
+        "-m",
+        "stateprobe.cli",
+        "skill",
+        "overlay",
+        "--context-text",
+        "Focus on safety; do not include deprecated APIs.",
+        "--output-text",
+        "The answer recommends a deprecated API first.",
+        "--json",
+    ])
+    result.check(
+        code == 0 and "interrupt_level" in output,
+        "README.md Skill overlay demo runs without repository example files",
+        output[-1000:],
+    )
     code, output = run_command([sys.executable, "scripts/validate_benchmark.py"])
     result.check(code == 0 and "validation passed" in output, "benchmark validate passes", output[-1000:])
 
