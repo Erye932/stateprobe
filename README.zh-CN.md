@@ -188,7 +188,7 @@ DeepSeek-first, not DeepSeek-only — 详见 [docs/DEEPSEEK_ROADMAP.md](docs/DEE
 - **v0.4** — DeepSeek-MoE expert routing contributor
 - **v0.5** — 命名情绪向量库；输出时干预 API
 
-完整计划：[project plan](docs/governance/PROJECT_PLAN.md)、[open-source plan](docs/governance/OPEN_SOURCE_PLAN.md)、[CHANGELOG](CHANGELOG.md)。
+完整版本历史：[CHANGELOG](CHANGELOG.md)。
 
 ## 一个延展方向（写给走到这里的你）
 
@@ -206,11 +206,7 @@ DeepSeek-first, not DeepSeek-only — 详见 [docs/DEEPSEEK_ROADMAP.md](docs/DEE
 - [Evidence model](docs/EVIDENCE_MODEL.md) — 三层证据边界（static / black-box / local activation）
 - [DeepSeek roadmap](docs/DEEPSEEK_ROADMAP.md) — DeepSeek-first, not DeepSeek-only
 - [FAQ](docs/FAQ.md) — 常见质疑（含闭源 API 拿不到 hidden states 的边界）
-- [Quality bar](docs/governance/QUALITY_BAR.md) — 10k-star reference 标准
-- [Operating rules](docs/governance/OPERATING_RULES.md) — Visibility-first, engineering-grounded, five gates
-- [Visibility plan](docs/governance/CONTRIBUTOR_VISIBILITY_PLAN.md) — 90-day strategy
-- [Open-source plan](docs/governance/OPEN_SOURCE_PLAN.md) — 完整开源项目计划
-- [Project plan](docs/governance/PROJECT_PLAN.md) — 项目北极星与版本路线
+- [Architecture decisions](docs/adr/) — ADR： hybrid pipeline / lab contributor
 - [Publishing](docs/PUBLISHING.md) — 安全发布流程
 - [CHANGELOG](CHANGELOG.md) / [CITATION](CITATION.cff) / [CODE_OF_CONDUCT](CODE_OF_CONDUCT.md) / [CONTRIBUTING](CONTRIBUTING.md)
 

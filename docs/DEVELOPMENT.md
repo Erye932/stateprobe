@@ -511,7 +511,6 @@ for c in contributors:
 - [adr/009-hybrid-engine.md](adr/009-hybrid-engine.md) - hybrid 架构的完整决策依据
 - [adr/decisions.md](adr/decisions.md) - 所有重大决策的简短记录
 - [EVIDENCE_MODEL.md](EVIDENCE_MODEL.md) - 证据数据模型详解
-- [governance/QUALITY_BAR.md](governance/QUALITY_BAR.md) - 代码 / 文档 / 发布质量标准
 - [governance/RUNBOOK.md](governance/RUNBOOK.md) - 运维 / 发版 / 平台发布 SOP
 
 ---

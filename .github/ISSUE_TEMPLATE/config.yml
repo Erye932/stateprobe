@@ -3,6 +3,6 @@ contact_links:
   - name: Evidence model
     url: https://github.com/Erye932/stateprobe/blob/main/docs/EVIDENCE_MODEL.md
     about: Read this before filing issues about activation claims.
-  - name: Quality bar
-    url: https://github.com/Erye932/stateprobe/blob/main/docs/governance/QUALITY_BAR.md
-    about: See the acceptance standard for changes.
+  - name: FAQ
+    url: https://github.com/Erye932/stateprobe/blob/main/docs/FAQ.md
+    about: Common objections and the project's stance on them.

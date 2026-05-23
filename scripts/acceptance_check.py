@@ -72,16 +72,11 @@ def check_required_files(result: Result) -> None:
         ".github/ISSUE_TEMPLATE/feature_request.md",
         ".github/ISSUE_TEMPLATE/rule_request.md",
         "docs/governance/PROJECT_BRIEF.md",
-        "docs/governance/PROJECT_PLAN.md",
-        "docs/governance/OPERATING_RULES.md",
         "docs/DEMO_WALKTHROUGH.md",
         "docs/ARCHITECTURE.md",
         "docs/EVIDENCE_MODEL.md",
         "docs/DEEPSEEK_ROADMAP.md",
         "docs/FAQ.md",
-        "docs/governance/QUALITY_BAR.md",
-        "docs/governance/OPEN_SOURCE_PLAN.md",
-        "docs/governance/CONTRIBUTOR_VISIBILITY_PLAN.md",
         "docs/PUBLISHING.md",
         "docs/RELEASE_CHECKLIST.md",
         "demos/README.md",
@@ -134,15 +129,10 @@ def check_readme(result: Result) -> None:
         # Demo path — EN README still links to the legacy demo by directory
         "smart_but_not_answering",
         # Doc links (must remain wired up after rewrite)
-        "docs/governance/PROJECT_PLAN.md",
-        "docs/governance/OPERATING_RULES.md",
         "docs/ARCHITECTURE.md",
         "docs/EVIDENCE_MODEL.md",
         "docs/DEEPSEEK_ROADMAP.md",
         "docs/FAQ.md",
-        "docs/governance/QUALITY_BAR.md",
-        "docs/governance/OPEN_SOURCE_PLAN.md",
-        "docs/governance/CONTRIBUTOR_VISIBILITY_PLAN.md",
         "docs/PUBLISHING.md",
         "CODE_OF_CONDUCT.md",
         "CITATION.cff",
@@ -178,7 +168,6 @@ def check_readme(result: Result) -> None:
         # Doc links must also exist in zh-CN (China-first readers land here)
         "docs/SKILL_ATTENTION_HUD.md",
         "docs/MCP_SERVER.md",
-        "docs/governance/PROJECT_PLAN.md",
         "CHANGELOG.md",
         "CONTRIBUTING.md",
     ]
@@ -199,30 +188,15 @@ def check_readme(result: Result) -> None:
 def check_docs(result: Result) -> None:
     evidence = read("docs/EVIDENCE_MODEL.md")
     faq = read("docs/FAQ.md")
-    open_source = read("docs/governance/OPEN_SOURCE_PLAN.md")
-    project_plan = read("docs/governance/PROJECT_PLAN.md")
-    operating_rules = read("docs/governance/OPERATING_RULES.md")
-    quality = read("docs/governance/QUALITY_BAR.md")
     deepseek_roadmap = read("docs/DEEPSEEK_ROADMAP.md")
-    visibility = read("docs/governance/CONTRIBUTOR_VISIBILITY_PLAN.md")
     result.check("Static rule evidence" in evidence, "evidence model explains static evidence")
     result.check("Black-box behavior evidence" in evidence, "evidence model explains black-box evidence")
     result.check("Local activation evidence" in evidence, "evidence model explains local activation evidence")
     result.check("just a bunch of regex" in faq, "FAQ answers regex objection")
     result.check("Does StateProbe read real activations?" in faq, "FAQ answers activation objection")
     result.check("Is StateProbe only for DeepSeek-R1?" in faq, "FAQ answers DeepSeek-only objection")
-    result.check("North star" in project_plan, "project plan defines north star")
-    result.check("Version roadmap" in project_plan, "project plan defines version roadmap")
-    result.check("First 30 days" in project_plan, "project plan defines first 30 days")
-    result.check("Visibility-first, engineering-grounded" in operating_rules, "operating rules state core rule")
-    result.check("Mandatory AI execution rule" in operating_rules, "operating rules define AI execution rule")
-    result.check("five gates" in operating_rules, "operating rules define the five gates")
-    result.check("GitHub launch checklist" in open_source, "open-source plan includes launch checklist")
-    result.check("10k-star reference bar" in quality, "quality bar includes high-star benchmark")
     result.check("DeepSeek-first, not DeepSeek-only" in deepseek_roadmap, "DeepSeek roadmap states project focus")
     result.check("future DeepSeek models" in deepseek_roadmap, "DeepSeek roadmap covers future model migration")
-    result.check("90-day strategy" in visibility, "visibility plan has 90-day strategy")
-    result.check("DeepSeek behavior benchmark seed" in visibility, "visibility plan prioritizes benchmark seed")
     contributing = read("CONTRIBUTING.md")
     changelog = read("CHANGELOG.md")
     security = read("SECURITY.md")

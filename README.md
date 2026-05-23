@@ -126,7 +126,7 @@ DeepSeek-first, not DeepSeek-only — see [DeepSeek roadmap](docs/DEEPSEEK_ROADM
 - **v0.4** — MoE expert routing contributor on DeepSeek-MoE
 - **v0.5** — Named steering vectors; output-time intervention API
 
-Full plan: [project plan](docs/governance/PROJECT_PLAN.md), [open-source plan](docs/governance/OPEN_SOURCE_PLAN.md), [CHANGELOG](CHANGELOG.md).
+See [CHANGELOG](CHANGELOG.md) for the full version history.
 
 ## Documentation
 
@@ -136,15 +136,11 @@ Full plan: [project plan](docs/governance/PROJECT_PLAN.md), [open-source plan](d
 - [FAQ](docs/FAQ.md) — common objections answered
 
 <details>
-<summary><b>More docs</b> — evidence model, governance, roadmaps, contributor guides</summary>
+<summary><b>More docs</b> — evidence model, ADRs, roadmaps, contributor guides</summary>
 
 - [Evidence model](docs/EVIDENCE_MODEL.md) — three-layer evidence boundaries
 - [DeepSeek roadmap](docs/DEEPSEEK_ROADMAP.md) — DeepSeek-first, not DeepSeek-only
-- [Quality bar](docs/governance/QUALITY_BAR.md) — 10k-star reference benchmark
-- [Operating rules](docs/governance/OPERATING_RULES.md) — visibility-first, engineering-grounded, five gates
-- [Visibility plan](docs/governance/CONTRIBUTOR_VISIBILITY_PLAN.md) — 90-day contributor strategy
-- [Open-source plan](docs/governance/OPEN_SOURCE_PLAN.md) — full launch plan
-- [Project plan](docs/governance/PROJECT_PLAN.md) — north star and version roadmap
+- [Architecture decisions](docs/adr/) — ADRs for hybrid pipeline and lab contributor
 - [Publishing](docs/PUBLISHING.md) — release process
 - [CHANGELOG](CHANGELOG.md) / [CITATION](CITATION.cff) / [CODE_OF_CONDUCT](CODE_OF_CONDUCT.md) / [CONTRIBUTING](CONTRIBUTING.md)
 
