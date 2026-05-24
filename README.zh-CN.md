@@ -109,12 +109,15 @@ stateprobe demo
 
 `stateprobe skill preview` 返回 JSON 里的 `activation_decision`，host 按它分支：
 
-| Action | 含义 |
-| --- | --- |
-| `continue` | 对齐了，agent 可以说话 |
-| `rewrite_planned_focus` | plan 漏了用户真正的 must。**别 ship**，先重写 focus |
-| `ask_boundary_question` | 视觉/创意有歧义。**先问用户一个 yes/no**，再继续 |
-| `cut_context_contamination` | agent 在跟旧上下文走。**先切掉旧方向** |
+| Action | 含义 | 是否中断 agent |
+| --- | --- | --- |
+| `continue` | 对齐了，agent 可以说话 | 否 |
+| `continue_with_warning` | 有风险信号，但证据不够强，不硬拦。**把 evidence 给用户看，不打断工作流。** | 否 |
+| `rewrite_planned_focus` | plan 漏了用户真正的 must，且证据具体。**别 ship**，先重写 focus | 是 |
+| `ask_boundary_question` | 视觉/创意有歧义。**先问用户一个 yes/no**，再继续 | 是 |
+| `cut_context_contamination` | agent 在跟旧上下文走。**先切掉旧方向** | 是 |
+
+每条决策都带 `confidence`（`low` / `medium` / `high`）和 `evidence`——具体命中了哪条用户要求、漏了什么。**有破坏性的硬停（`rewrite_planned_focus`、`cut_context_contamination`）只在 `high` confidence 下触发**；`ask_boundary_question` 在 `medium` 也能触发——它的代价只是问用户一句 yes/no，不会改写计划。再弱的信号一律降级成 `continue_with_warning`，避免规则一拍脑袋就打断 agent。这条契约让 StateProbe 是可信的注意力外挂，不是规则裁判。
 
 `stateprobe skill overlay` 返回 `interrupt_level`（`ok` / `watch` / `interrupt`）+ `attention_gaps` + `control_levers`，告诉你下一轮怎么纠。
 
@@ -134,17 +137,31 @@ stateprobe demo
 
 ## 这是什么、不是什么
 
-**StateProbe 是**：
-- agent 输出前的注意力控制层
-- 每次问题给你一份属于这一次的权重切片
-- 让你「自向定位」——看清这次激活了什么，自己改、自己调，不靠别人的 prompt 模板
+**StateProbe 是** agent 工作流里的 **preflight**：在 agent 真正动手前（调工具、写代码、发邮件、出图），把它准备关注什么、忽略了什么、有没有被旧上下文带偏，用结构化控制信号暴露出来。它是一份你这一次问题专属的注意力切片。
 
 **StateProbe 不是**：
-- 不是又一个 prompt 模板库
-- 不是 SOP 生成器
-- 不是 prompt 优化魔法（咒语优化没有可复现证据，本项目不押注那条路）
-- 不是简单正则 prompt 检查器
-- **不是替代提示词工程**——是它的一个分支，用证据代替体感
+
+- **不是 oracle**。规则裁判一定有误报漏报。所以每条判决都带 `confidence` + `evidence`，**只有 `high` confidence 才会真的硬停 agent**。
+- **不是人工 / LLM review 的替代品**。review 看的是已经写完的东西，StateProbe 看的是 agent 准备关注什么。互补，不是替代。
+- **不是语义正确性检查**。它判断不了你的代码对不对、论点对不对、设计好不好。它只判断注意力对没对齐——领域真伪不是它的活。
+- **不是「再开一个 agent 来当裁判」的封装**。重点是默认路径**本地、确定、零 API 成本**，给出可分支的 `activation_decision`，而不是一段 LLM 评语。
+- **不是 prompt 优化魔法**（咒语优化没有可复现证据，本项目不押注那条路）。
+- **不是又一个 prompt 模板库 / SOP 生成器 / 正则 prompt 检查器**。
+- **不是替代提示词工程**——是它的一个分支，用证据代替体感。
+
+一句话定位：**低成本、可解释、可接进 agent host 的注意力 preflight；不当裁判、不当 benchmark、不当保证**。
+
+## 已知误判模式
+
+StateProbe 一定会在下面这些情况判错。完整清单在 [`tests/fixtures/skill_cases.jsonl`](https://github.com/Erye932/stateprobe/blob/main/tests/fixtures/skill_cases.jsonl)（当前 51 个 case 里有 19 条 `known_issue`）。常见模式：
+
+- **同义词 / 反义词漏判**：`不要提缺点` 被 `列举需要改进的地方` 违反，但字面无重叠，规则抓不到。
+- **「避免 + must_not 关键词」误判**：plan 写 `避免使用营销话术`，字面上还是命中了 `营销话术`，匹配器照样开枪。
+- **隐式实现误判**：画图 plan 用 `闭眼微笑、背景柔和` 实现了 `放松的状态`，但抽象词没字面出现，被硬停。
+- **修饰语丢失**：plan 覆盖了主 must（`解释 RAG`），漏了软修饰（`面向新手`），算法硬停，人会判软警告。
+- **空 plan / 问句 plan**：plan 只写 `好的` 或一句反问，应该硬停，今天只软警告。
+
+每一条在 fixture 的 `notes` 字段里写了修复路径，不是甩锅。这些都不是 preflight 契约的硬伤，而是用户应该用真实 case 把校准集扩起来的方向。
 
 ## 和现有工具的区别
 
@@ -189,10 +206,11 @@ DeepSeek-first, not DeepSeek-only — 详见 [docs/DEEPSEEK_ROADMAP.md](https://
 
 ## 路线图
 
-- **v0.3** *(当前)* — Skill HUD、MCP server、Lab 激活投影 4 轴
-- **v0.3.1** — 补齐剩余 4 轴；embedding contributor 离线兜底；VS Code / Cursor 插件
-- **v0.4** — DeepSeek-MoE expert routing contributor
-- **v0.5** — 命名情绪向量库；输出时干预 API
+- **v0.3** — Skill HUD、MCP server、Lab 激活投影 4 轴
+- **v0.3.1** — Windows CLI 编码 + launch demo 打磨
+- **v0.4** *(当前)* — 证据驱动的 `activation_decision`：每条判决带 `confidence` + `evidence`，只有 `high` confidence 才硬停；附带 51 case 人工标注的校准集（32 agree / 19 公开记录的 known issues）和对应的 contamination / `must_not` 概念扩展 / 模态门修复
+- **v0.4.x** — 关掉公开的 known issues：同义词 / 反义词词表（ISSUE-005/006/020）、修饰语感知覆盖率（ISSUE-001/009）、plan substance 检测（ISSUE-012/018）、更多 pivot markers（ISSUE-007）；用户量起来后再做 host 反馈通道
+- **v0.5** — DeepSeek-MoE expert routing contributor；命名情绪向量库；输出时干预 API
 
 完整版本历史：[CHANGELOG](https://github.com/Erye932/stateprobe/blob/main/CHANGELOG.md)。
 

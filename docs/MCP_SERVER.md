@@ -103,21 +103,26 @@ python -m stateprobe.mcp_server
 
 `activation_decision` 包含：
 
-- `action`：下一步动作，取值是 `continue`、`rewrite_planned_focus`、`ask_boundary_question`、`cut_context_contamination`
+- `action`：下一步动作，取值是 `continue`、`continue_with_warning`、`rewrite_planned_focus`、`ask_boundary_question`、`cut_context_contamination`
 - `should_stop`：如果是 `true`，host 不应该让 agent 继续输出用户可见内容
+- `confidence`：决策有多确定，`low` / `medium` / `high`。**只有 `high` 会送出 hard stop**；证据不够强时会自动降级为 `continue_with_warning`
 - `reason`：为什么要这么做
 - `message`：可以展示给用户或 agent 的一句话
-- `blockers`：触发停止的原因标签，比如 `high_preview_risk`、`boundary_question`、`context_contamination`
+- `blockers`：触发停止/警告的原因标签，比如 `high_preview_risk`、`boundary_question`、`context_contamination`、`attention_warning`
+- `evidence`：决策所依据的具体证据——用户哪条要求、plan 哪里漏了、上下文哪段被旧任务污染了
 - `next_steps`：恢复输出前应该执行的修正步骤
 
-四种 `action` 的意思：
+五种 `action` 的意思：
 
 | action | host 应该怎么做 |
 |---|---|
 | `continue` | 理解基本对齐，可以继续输出 |
+| `continue_with_warning` | 不要打断工作流；把 `evidence` 暴露给用户/agent，让他们自己决定是否调整 |
 | `rewrite_planned_focus` | 先别输出，按 `next_steps` 重写计划，再跑一次 preview |
 | `ask_boundary_question` | 先把 `message` 问给用户，合并回答后再继续 |
 | `cut_context_contamination` | 先删掉旧上下文残留，重新对准用户最新要求 |
+
+> StateProbe Skill 不是 oracle。硬拦只在 `confidence=high` 且有具体 `evidence` 时触发；证据不够强的风险会走 `continue_with_warning` 路径，让 host 看到 evidence 但不会被中断。
 
 ### Overlay 输出
 
@@ -125,7 +130,14 @@ python -m stateprobe.mcp_server
 
 - `drift_level`
 - `drift_score`
-- `interrupt_level`
+- `interrupt_level` — `ok` / `watch` / `interrupt`
+- `interrupt_confidence` — `low` / `medium` / `high`. Mirrors the
+  preview-side `activation_decision.confidence`. Only `high` + a
+  non-empty `interrupt_evidence` produces `interrupt`; weaker signals
+  downgrade to `watch`.
+- `interrupt_evidence` — list of human-readable reasons backing the
+  verdict. Hosts should display these to the user instead of treating
+  `interrupt` as an oracle.
 - `user_intent_map`
 - `agent_attention_map`
 - `attention_gaps`
@@ -253,8 +265,8 @@ activation_decision.should_stop 为 true 时，不要输出用户可见内容。
 1. 把用户当前要求收成 `context`。
 2. 把 agent 草稿或刚发出的回复收成 `output`。
 3. 调用 `stateprobe_overlay_attention`。
-4. 如果 `interrupt_level == "interrupt"`，停止当前方向，应用 `control_levers` 后重启。
-5. 如果 `interrupt_level == "watch"`，写完当前句或当前段后，应用 `boost` / `return_to`。
+4. 如果 `interrupt_level == "interrupt"` 且 `interrupt_confidence == "high"`，停止当前方向，把 `interrupt_evidence` 透传给用户，再应用 `control_levers` 重启。
+5. 如果 `interrupt_level == "watch"`（包括 `interrupt_confidence` 是 `medium` / `low` 时被自动降级的情况），写完当前句或当前段后，应用 `boost` / `return_to`，把 `interrupt_evidence` 作为软提示展示，但不要硬停。
 6. 不要把这一层说成神经可解释性；它是任务层文本控制。
 
 ## 边界

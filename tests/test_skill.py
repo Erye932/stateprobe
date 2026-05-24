@@ -53,6 +53,57 @@ def test_analyze_attention_flags_negative_requirement_violation():
     assert any("不要做前端界面" in line for line in hud.next_turn_patch)
 
 
+def test_overlay_interrupt_requires_high_confidence_and_evidence():
+    """Overlay must only fire `interrupt` when it has high-confidence
+    evidence (must_not violation OR 2+ high-strength ignored musts).
+    """
+
+    hud = analyze_attention(
+        "核心是让agent的注意力可见。重点是输出前 preview。",
+        "StateProbe 是一个 prompt 模板生成器，能产出格式化建议。",
+    )
+
+    assert hud.interrupt_level == "interrupt"
+    assert hud.interrupt_confidence == "high"
+    assert hud.interrupt_evidence, "hard interrupt must surface evidence"
+    payload = hud.to_dict()
+    assert payload["interrupt_level"] == "interrupt"
+    assert payload["interrupt_confidence"] == "high"
+    assert isinstance(payload["interrupt_evidence"], list)
+    assert payload["interrupt_evidence"], (
+        "JSON serialization must include the evidence list so MCP hosts "
+        "can show users why StateProbe wants the agent paused."
+    )
+
+
+def test_overlay_borderline_signal_downgrades_to_watch_not_interrupt():
+    """A single weakly-covered must with no must_not violation must
+    NOT produce a hard interrupt. The contract says: never hard-stop
+    on a hunch — downgrade to ``watch`` instead.
+    """
+
+    hud = analyze_attention(
+        "核心是让agent的注意力可见。",
+        "我们简单提到了注意力。",
+    )
+
+    assert hud.interrupt_level != "interrupt"
+    assert hud.interrupt_confidence in {"low", "medium"}
+
+
+def test_overlay_aligned_output_does_not_interrupt():
+    """When the agent output covers the user's must, overlay must
+    not surface a hard interrupt regardless of drift heuristics.
+    """
+
+    hud = analyze_attention(
+        "核心是让agent的注意力可见。",
+        "本次输出展示了一张完整的注意力地图，并解释了用户每条要求是否被回应。",
+    )
+
+    assert hud.interrupt_level != "interrupt"
+
+
 def test_analyze_attention_low_drift_when_requirements_are_reflected():
     hud = analyze_attention(
         "核心是让agent的注意力可见。必须先做skill再做企业线。",
@@ -478,6 +529,14 @@ def test_phase11_preview_attention_interrupts_bad_planned_focus():
     assert any("注意力" in s for s in preview.control_levers.boost)
     assert preview.activation_decision.action == "rewrite_planned_focus"
     assert preview.activation_decision.should_stop is True
+    # Hard stops must always come with high confidence and concrete evidence,
+    # so downstream agents can defend the decision instead of trusting it blindly.
+    assert preview.activation_decision.confidence == "high"
+    assert preview.activation_decision.evidence
+    assert any(
+        "核心是让agent的注意力可见" in line
+        for line in preview.activation_decision.evidence
+    )
 
 
 def test_phase11_preview_attention_allows_aligned_planned_focus():
@@ -489,8 +548,60 @@ def test_phase11_preview_attention_allows_aligned_planned_focus():
     assert preview.risk_level in {"low", "medium"}
     assert preview.should_continue is True
     assert preview.to_dict()["planned_attention_map"]
-    assert preview.activation_decision.action == "continue"
+    # Aligned planned focus must never block output. We accept both
+    # ``continue`` and ``continue_with_warning`` because the real contract
+    # is "do not stop the agent", not a fixed action label.
+    assert preview.activation_decision.action in {
+        "continue",
+        "continue_with_warning",
+    }
     assert preview.activation_decision.should_stop is False
+    assert preview.activation_decision.confidence in {"low", "medium", "high"}
+
+
+def test_preview_activation_decision_exposes_confidence_and_evidence_on_hard_stop():
+    """Hard-stop decisions must always carry concrete evidence + confidence.
+
+    Locks the contract that StateProbe is evidence-driven, not an opaque
+    oracle. If a future change ships a hard stop with empty evidence or
+    sub-high confidence, this test breaks loudly.
+    """
+    preview = preview_attention(
+        "核心是让agent的注意力可见。不要把格式化当主线。",
+        "我准备重点写prompt检查器和格式化模板。",
+    )
+
+    decision = preview.activation_decision
+    payload = preview.to_dict()["activation_decision"]
+
+    assert decision.should_stop is True
+    assert decision.confidence == "high"
+    assert decision.evidence
+    assert payload["confidence"] == "high"
+    assert payload["evidence"] == decision.evidence
+    assert payload["action"] == "rewrite_planned_focus"
+
+
+def test_preview_activation_decision_downgrades_uncertain_signal_to_warning():
+    """Medium risk + uncertain evidence must never produce a hard stop.
+
+    Pure rule-based judges feel like a black box; this test pins the
+    new contract — when evidence is not strong enough we surface a
+    ``continue_with_warning`` action so agent hosts keep moving instead
+    of being interrupted by every borderline signal.
+    """
+    preview = preview_attention(
+        "核心是让agent的注意力可见。不要把格式化当主线。",
+        "我会先展示agent注意力可见HUD，再说明如何避免格式化成为主线。",
+    )
+
+    decision = preview.activation_decision
+    assert decision.should_stop is False
+    assert preview.should_continue is True
+    assert decision.action in {"continue", "continue_with_warning"}
+    if decision.action == "continue_with_warning":
+        assert decision.evidence
+        assert decision.confidence in {"low", "medium"}
 
 
 def test_phase11_skill_preview_cli_json_accepts_inline_text():
@@ -658,6 +769,28 @@ def test_phase12_skill_preview_cli_json_includes_boundary_fields():
     assert payload["boundary_decomposition"] is not None
     assert payload["literalization_risks"]
     assert payload["boundary_questions"]
+
+
+def test_contamination_does_not_fire_on_single_task_emphasis_only_context():
+    """Single coherent tasks must never trigger contamination detection.
+
+    Inputs like ``"核心是 X。不要 Y。"`` are one task with an emphasis
+    plus a restriction; they are NOT "old task → new task". Earlier
+    versions treated 不要/核心是/重点是 as pivot markers and produced
+    contamination evidence on plain single-task contexts, undermining
+    the credibility of the evidence list itself.
+    """
+    preview = preview_attention(
+        "核心是让agent的注意力可见。不要把格式化当主线。",
+        "我会先展示agent注意力可见HUD，再说明如何避免格式化成为主线。",
+    )
+
+    payload = preview.to_dict()
+    assert payload["context_contamination_risks"] == []
+    decision = preview.activation_decision
+    assert decision.action != "cut_context_contamination"
+    for line in decision.evidence:
+        assert "旧上下文污染" not in line
 
 
 def test_phase13_preview_detects_context_contamination_from_old_focus():

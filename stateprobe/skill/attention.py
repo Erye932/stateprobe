@@ -63,6 +63,35 @@ NEGATIVE_MARKERS_EN: Tuple[str, ...] = (
 # 停用词（关键词提取时跳过）
 # ---------------------------------------------------------------------------
 
+# Conservative concept → instance expansions for must_not requirements.
+# Used by `_score_requirement` so that "不要用第三方库" actually fires
+# when the plan says "用 numpy". The list is intentionally narrow:
+# semantic synonym matching at scale produces a false-positive
+# explosion, so we only encode obvious technical concept words plus
+# the most common product / API category names. Each instance is
+# matched as a substring against the agent output.
+MUST_NOT_EXPANSIONS: Dict[str, Tuple[str, ...]] = {
+    "第三方库": (
+        "numpy", "pandas", "scipy", "sklearn", "scikit-learn",
+        "matplotlib", "seaborn", "plotly", "torch", "pytorch",
+        "tensorflow", "keras", "transformers", "huggingface",
+        "requests", "httpx", "aiohttp", "lxml", "beautifulsoup",
+        "pyyaml", "fastapi", "flask", "django", "click", "rich",
+        "pydantic", "openai", "anthropic",
+    ),
+    "外部依赖": (
+        "numpy", "pandas", "requests", "httpx", "fastapi",
+        "django", "flask", "openai", "anthropic",
+    ),
+    "外部库": (
+        "numpy", "pandas", "requests", "httpx", "fastapi",
+        "django", "flask", "openai", "anthropic",
+    ),
+    "废弃 api": ("deprecated",),
+    "废弃api": ("deprecated",),
+}
+
+
 STOPWORDS = {
     # 中文功能字
     "的", "了", "在", "是", "有", "和", "与", "或", "也", "都",
@@ -246,9 +275,11 @@ class ControlLevers:
 class ActivationDecision:
     action: str
     should_stop: bool
+    confidence: str
     reason: str
     message: str
     blockers: List[str]
+    evidence: List[str]
     next_steps: List[str]
 
     def to_dict(self) -> Dict:
@@ -268,6 +299,10 @@ class AttentionHUD:
     - ``control_levers``：下一轮可执行的 boost / suppress / stop_doing /
       return_to。
     - ``interrupt_level``：是否应当暂停当前输出。
+    - ``interrupt_confidence`` / ``interrupt_evidence``：``interrupt_level``
+      的证据驱动支撑。``interrupt`` 只在 ``confidence=high`` 且有具体
+      ``evidence`` 时触发，否则降级为 ``watch``，与 preview 的
+      ``activation_decision`` 契约保持一致。
 
     既有字段（``reflected`` / ``weak`` / ``ignored`` / ``violated`` /
     ``drift_level`` / ``next_turn_patch`` 等）保持不变，是 Phase 7 字段的
@@ -289,6 +324,8 @@ class AttentionHUD:
     output_trajectory: Optional[OutputTrajectory] = None
     control_levers: Optional[ControlLevers] = None
     interrupt_level: str = "ok"  # "ok" | "watch" | "interrupt"
+    interrupt_confidence: str = "low"  # "low" | "medium" | "high"
+    interrupt_evidence: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict:
         return {
@@ -315,6 +352,8 @@ class AttentionHUD:
                 self.control_levers.to_dict() if self.control_levers else None
             ),
             "interrupt_level": self.interrupt_level,
+            "interrupt_confidence": self.interrupt_confidence,
+            "interrupt_evidence": list(self.interrupt_evidence),
         }
 
 
@@ -502,6 +541,30 @@ CONCRETE_ENTITY_MARKERS_ZH: Tuple[str, ...] = (
 
 VISUAL_FORBIDDEN_MARKERS: Tuple[str, ...] = (
     "游戏UI", "游戏 UI", "UI", "界面", "文字", "字幕", "水印",
+)
+
+# Task modality markers. The literalisation detector and boundary-
+# question generator are visual-prompt heuristics — they look at verbs
+# like "打 / 看 / 写" and assume the model will render them onto a
+# canvas. That assumption is wrong for plain text tasks (emails, code,
+# documents). When the user context is unambiguously a text-only task
+# we skip those detectors entirely.
+VISUAL_TASK_MARKERS_ZH: Tuple[str, ...] = (
+    "画", "绘", "图片", "插画", "海报", "封面", "图标", "图示", "示意图",
+    "渲染", "构图", "设计图", "视觉", "画面", "画一", "画个", "画张",
+)
+VISUAL_TASK_MARKERS_EN: Tuple[str, ...] = (
+    "draw", "paint", "render", "illustrate", "picture", "image",
+    "poster", "cover", "sketch",
+)
+TEXT_ONLY_TASK_MARKERS_ZH: Tuple[str, ...] = (
+    "邮件", "信", "文档", "代码", "函数", "脚本", "报告", "文章",
+    "回复", "解释", "说明", "回答", "总结", "提纲", "大纲", "讲解",
+    "翻译", "校对", "周报", "日报", "纪要", "公告", "通知",
+)
+TEXT_ONLY_TASK_MARKERS_EN: Tuple[str, ...] = (
+    "email", "letter", "document", "report", "essay", "article",
+    "code", "function", "script", "summary", "translation",
 )
 
 DISPLAY_PHRASES_ZH: Tuple[str, ...] = (
@@ -749,6 +812,34 @@ def _boost_repeated(reqs: List[Requirement]) -> None:
 # 覆盖度计算
 # ---------------------------------------------------------------------------
 
+def _is_core_keyword(kw: str) -> bool:
+    """A keyword is *core* if it is unlikely to be grammatical filler.
+
+    English / latin tokens are always core (filtering already happened
+    at extraction time via STOPWORDS).
+
+    For CJK keywords we keep only length-3 n-grams whose first and
+    last character are not Chinese function words. Length-2 bigrams
+    are too noisy as denominators for coverage scoring — they tend to
+    blow up the denominator and drown out the real concept hits, e.g.
+    a plan that legitimately covers ``"注意力"`` ends up at 1/27 because
+    the requirement also produced ``"重点是" / "点是让" / "是让用"``…
+    Those bigrams remain in the keyword list for display / matching
+    fallback, but do not weigh on the score.
+    """
+
+    if re.match(r"^[a-z0-9_-]+$", kw):
+        return True
+    if not kw:
+        return False
+    if not re.fullmatch(r"[\u4e00-\u9fff]+", kw):
+        # Mixed / non-CJK — treat as core to avoid losing entity terms.
+        return True
+    if len(kw) < 3:
+        return False
+    return all(ch not in STOPWORDS for ch in kw)
+
+
 def _score_requirement(
     req: Requirement,
     output: str,
@@ -771,12 +862,40 @@ def _score_requirement(
             if kw in output:
                 matched.append(kw)
 
-    coverage = len(matched) / len(req.keywords)
+    # Core-only denominator. We still report ``matched`` as-is for
+    # display, but the score uses only concept words so a plan that
+    # actually covers the real must does not get diluted by the
+    # n-gram tail of stopword-glued bigrams. We only switch to the
+    # core denominator when there are at least 3 core tokens — with
+    # fewer, hitting a single concrete noun would jump coverage to
+    # 0.5 and let literalising plans (HARD-003) escape `ignored`.
+    core_total = [k for k in req.keywords if _is_core_keyword(k)]
+    core_matched = [k for k in matched if _is_core_keyword(k)]
+    if len(core_total) >= 3:
+        coverage = len(core_matched) / len(core_total)
+    else:
+        coverage = len(matched) / len(req.keywords)
 
     if req.polarity == "must_not":
-        # 否定要求门槛更低：n-gram 膨胀导致分母大，
-        # 但只要核心概念出现在输出里就算违反。
-        if coverage >= 0.3:
+        # 否定要求：除直接关键词命中外，再做一次"概念词 → 实例词"的
+        # 受控扩展。这是为了让 "不要用第三方库" 在 plan 说 "用 numpy"
+        # 时仍能触发违反。扩展列表很短（见 MUST_NOT_EXPANSIONS），故
+        # 不会引入大规模 synonym false positives。
+        expansion_hits: List[str] = []
+        req_text_low = req.text.lower()
+        for concept, instances in MUST_NOT_EXPANSIONS.items():
+            if concept in req_text_low:
+                for inst in instances:
+                    if inst in output_low and inst not in matched:
+                        matched.append(inst)
+                        expansion_hits.append(inst)
+
+        # 否定要求门槛：直接概念实例命中（expansion）→ 立即违反；
+        # 普通 n-gram 命中仍走 coverage 阈值，避免 plan 顺带提到禁止词
+        # （例如 "避免 X 成为主线"）就被误判为 violated。
+        if expansion_hits:
+            status = "violated"
+        elif coverage >= 0.3:
             status = "violated"
         elif coverage > 0.0:
             status = "weak"
@@ -1168,15 +1287,130 @@ def _build_control_levers(
     )
 
 
+def _interrupt_evidence(
+    coverages: List[RequirementCoverage],
+    drift_level: str,
+) -> List[str]:
+    """Build a concrete evidence list backing an interrupt/watch verdict.
+
+    Mirrors the preview-side ``_decision_evidence`` contract: every entry
+    is a self-contained line that the host can show to a user to
+    explain *why* StateProbe wants the agent paused.
+    """
+
+    lines: List[str] = []
+    seen: set = set()
+
+    def _push(line: str) -> None:
+        line = line.strip()
+        if not line or line in seen:
+            return
+        seen.add(line)
+        lines.append(line)
+
+    for cov in coverages:
+        if cov.status != "violated":
+            continue
+        matched = ", ".join(cov.matched_keywords[:3]) or "—"
+        _push(
+            f"违反 must_not：{cov.requirement.text}；agent 输出命中禁止词：{matched}"
+        )
+
+    high_priority_ignored = [
+        cov
+        for cov in coverages
+        if cov.status == "ignored"
+        and cov.requirement.polarity == "must"
+        and cov.requirement.strength >= 0.6
+    ]
+    for cov in high_priority_ignored[:3]:
+        _push(
+            f"忽略 must：{cov.requirement.text}；coverage={cov.coverage:.2f}"
+        )
+
+    weak_high_priority = [
+        cov
+        for cov in coverages
+        if cov.status == "weak"
+        and cov.requirement.polarity == "must"
+        and cov.requirement.strength >= 0.6
+    ]
+    if not lines and weak_high_priority:
+        for cov in weak_high_priority[:2]:
+            _push(
+                f"弱化 must：{cov.requirement.text}；coverage={cov.coverage:.2f}"
+            )
+
+    if drift_level == "high" and not lines:
+        # Drift is loud but no specific blocker — keep it as evidence so
+        # downstream confidence stays at "low".
+        _push("drift_level=high；agent 注意力整体偏离用户意图")
+
+    return lines
+
+
+def _interrupt_confidence(
+    coverages: List[RequirementCoverage],
+    drift_level: str,
+    evidence: List[str],
+) -> str:
+    """Derive interrupt confidence from concrete evidence strength.
+
+    - ``high``: an explicit must_not violation, or two+ high-strength
+      ``ignored`` musts. These are the only signals strong enough to
+      hard-stop the agent post-output.
+    - ``medium``: exactly one high-strength ``ignored`` must, or
+      ``drift_level=high`` *with* at least one weak/ignored must. Enough
+      to surface a watch with evidence; not enough to hard-stop.
+    - ``low``: anything else (only weak coverages, or drift alone).
+    """
+
+    if not evidence:
+        return "low"
+
+    has_violation = any(c.status == "violated" for c in coverages)
+    high_priority_ignored = [
+        c
+        for c in coverages
+        if c.status == "ignored"
+        and c.requirement.polarity == "must"
+        and c.requirement.strength >= 0.6
+    ]
+    if has_violation:
+        return "high"
+    if len(high_priority_ignored) >= 2:
+        return "high"
+    if len(high_priority_ignored) == 1:
+        return "medium"
+    if drift_level == "high":
+        return "medium"
+    return "low"
+
+
 def _compute_interrupt(
     drift_level: str,
     coverages: List[RequirementCoverage],
-) -> str:
-    if drift_level == "high" or any(c.status == "violated" for c in coverages):
-        return "interrupt"
-    if drift_level == "medium":
-        return "watch"
-    return "ok"
+) -> Tuple[str, str, List[str]]:
+    """Return ``(interrupt_level, interrupt_confidence, evidence)``.
+
+    ``interrupt`` only fires on ``confidence=high`` *and* a non-empty
+    evidence list. Anything weaker downgrades to ``watch``. Drift alone
+    no longer produces an interrupt — without a concrete blocker, even
+    ``drift_level=high`` is at most ``watch``. This matches preview's
+    activation_decision contract: never hard-stop on a hunch.
+    """
+
+    evidence = _interrupt_evidence(coverages, drift_level)
+    confidence = _interrupt_confidence(coverages, drift_level, evidence)
+
+    if confidence == "high" and evidence:
+        level = "interrupt"
+    elif evidence or drift_level in {"medium", "high"}:
+        level = "watch"
+    else:
+        level = "ok"
+
+    return level, confidence, evidence
 
 
 def _preview_opening_patch(
@@ -1221,25 +1455,45 @@ def _build_activation_decision(
     boundary_questions: List["BoundaryQuestion"],
     contamination_risks: List["ContextContaminationRisk"],
 ) -> ActivationDecision:
+    confidence = _decision_confidence(
+        risk_level, gaps, boundary_questions, contamination_risks
+    )
+    evidence = _decision_evidence(gaps, boundary_questions, contamination_risks)
+
     if any(r.severity == "high" for r in contamination_risks):
         return ActivationDecision(
             action="cut_context_contamination",
             should_stop=True,
+            confidence="high",
             reason="planned_focus is following older context instead of the latest pivot",
             message="先切断旧上下文污染，再重写 planned_focus。",
             blockers=["context_contamination"],
+            evidence=evidence,
             next_steps=patch,
         )
 
     if not should_continue:
         blockers = ["high_preview_risk"] if risk_level == "high" else []
         blockers.extend(g.kind for g in gaps if g.severity == "high")
+        if confidence != "high":
+            return ActivationDecision(
+                action="continue_with_warning",
+                should_stop=False,
+                confidence=confidence,
+                reason="planned_focus has risk signals, but evidence is not strong enough for a hard stop",
+                message="可以继续，但请先检查 evidence；不要把 warning 当成最终裁判。",
+                blockers=blockers or ["attention_warning"],
+                evidence=evidence,
+                next_steps=patch,
+            )
         return ActivationDecision(
             action="rewrite_planned_focus",
             should_stop=True,
+            confidence=confidence,
             reason="planned_focus misses or violates high-priority user requirements",
             message="不要进入正文；先按 opening_patch 重写 planned_focus。",
             blockers=blockers or ["misaligned_planned_focus"],
+            evidence=evidence,
             next_steps=patch,
         )
 
@@ -1248,9 +1502,11 @@ def _build_activation_decision(
         return ActivationDecision(
             action="ask_boundary_question",
             should_stop=True,
+            confidence=confidence,
             reason="creative prompt has an ambiguous visual boundary",
             message=question.question,
             blockers=["boundary_question"],
+            evidence=evidence,
             next_steps=[
                 f"Ask: {question.question}",
                 "Merge the user's A/B/C answer into context.",
@@ -1258,14 +1514,66 @@ def _build_activation_decision(
             ],
         )
 
+    if risk_level == "medium" and evidence:
+        return ActivationDecision(
+            action="continue_with_warning",
+            should_stop=False,
+            confidence=confidence,
+            reason="planned_focus is usable, but there are medium-risk attention gaps",
+            message="可以继续，但建议先看 evidence，必要时微调 planned_focus。",
+            blockers=[g.kind for g in gaps] or ["medium_preview_risk"],
+            evidence=evidence,
+            next_steps=patch,
+        )
+
     return ActivationDecision(
         action="continue",
         should_stop=False,
+        confidence=confidence,
         reason="planned_focus is aligned enough to start",
         message="可以继续；输出开头保持当前注意力分配。",
         blockers=[],
+        evidence=evidence,
         next_steps=patch,
     )
+
+
+def _decision_confidence(
+    risk_level: str,
+    gaps: List[AttentionGap],
+    boundary_questions: List["BoundaryQuestion"],
+    contamination_risks: List["ContextContaminationRisk"],
+) -> str:
+    if any(r.severity == "high" for r in contamination_risks):
+        return "high"
+    high_gaps = [g for g in gaps if g.severity == "high"]
+    if risk_level == "high" and high_gaps:
+        return "high"
+    if risk_level in {"high", "medium"} or high_gaps or boundary_questions:
+        return "medium"
+    return "low"
+
+
+def _decision_evidence(
+    gaps: List[AttentionGap],
+    boundary_questions: List["BoundaryQuestion"],
+    contamination_risks: List["ContextContaminationRisk"],
+) -> List[str]:
+    evidence: List[str] = []
+    for risk in contamination_risks[:2]:
+        evidence.append(
+            f"旧上下文污染：planned_focus 继续关注「{risk.contaminant}」，"
+            f"但当前任务是「{risk.active_context}」。"
+        )
+    for gap in gaps[:3]:
+        evidence.append(
+            f"{gap.severity} {gap.kind}：{gap.label}；{gap.why}"
+        )
+    for question in boundary_questions[:1]:
+        evidence.append(
+            f"边界不清：{question.element}；需要确认「{question.question}」"
+        )
+    return evidence
 
 
 # ---------------------------------------------------------------------------
@@ -1463,8 +1771,38 @@ def _decompose_boundaries(
 # 字面化风险检测
 # ---------------------------------------------------------------------------
 
+def _is_visual_task(text: str) -> bool:
+    if not text:
+        return False
+    low = text.lower()
+    if any(marker in text for marker in VISUAL_TASK_MARKERS_ZH):
+        return True
+    return any(marker in low for marker in VISUAL_TASK_MARKERS_EN)
+
+
+def _is_text_only_task(text: str) -> bool:
+    if not text:
+        return False
+    low = text.lower()
+    if any(marker in text for marker in TEXT_ONLY_TASK_MARKERS_ZH):
+        return True
+    return any(marker in low for marker in TEXT_ONLY_TASK_MARKERS_EN)
+
+
 def _detect_literalization(user_context: str) -> List[LiteralizationRisk]:
-    """扫描用户上下文，识别会被模型字面渲染的动作/状态。"""
+    """扫描用户上下文，识别会被模型字面渲染的动作/状态。
+
+    Visual literalisation is irrelevant for plain text tasks (writing
+    an email, drafting a document, generating code). When the context
+    explicitly names a text task and contains no visual markers, we
+    skip detection entirely so that verbs like ``写`` ("写邮件" /
+    "写函数") no longer trigger spurious "do you really want to render
+    this on a canvas?" questions.
+    """
+
+    if _is_text_only_task(user_context) and not _is_visual_task(user_context):
+        return []
+
     risks: List[LiteralizationRisk] = []
     seen: set = set()
 
@@ -1617,15 +1955,32 @@ def _make_options_for_risk(risk: LiteralizationRisk) -> List[BoundaryOption]:
     ]
 
 
-PIVOT_MARKERS_ZH: Tuple[str, ...] = (
+# 任务级"切换"标记：明确的"老任务 → 新任务"信号。
+# 只有这类标记出现时，contamination 检测器才会把它前面的句子当成
+# 旧上下文，把它后面的句子当成当前任务。
+HARD_PIVOT_MARKERS_ZH: Tuple[str, ...] = (
     "现在", "当前", "这次", "接下来", "改成", "换成",
+)
+
+HARD_PIVOT_MARKERS_EN: Tuple[str, ...] = (
+    "now", "current", "this time", "instead", "switch to",
+)
+
+# 同一任务内部的强调 / 限制 / 对照语。它们经常出现在合规要求里
+# （"核心是 X，不要 Y"），但**不是**任务切换。早期版本把这些误认
+# 成 pivot，导致 contamination 检测在单一任务里也会误报。
+EMPHASIS_MARKERS_ZH: Tuple[str, ...] = (
     "重点是", "核心是", "不是", "而是", "不要", "别再",
 )
 
-PIVOT_MARKERS_EN: Tuple[str, ...] = (
-    "now", "current", "this time", "instead", "switch to",
+EMPHASIS_MARKERS_EN: Tuple[str, ...] = (
     "focus on", "not", "rather than", "do not", "don't",
 )
+
+# 旧的 PIVOT_MARKERS_* 名字保留为聚合别名，供其他模块复用，避免
+# 一次性大改。新逻辑请用 HARD_PIVOT_MARKERS_* / EMPHASIS_MARKERS_*。
+PIVOT_MARKERS_ZH: Tuple[str, ...] = HARD_PIVOT_MARKERS_ZH + EMPHASIS_MARKERS_ZH
+PIVOT_MARKERS_EN: Tuple[str, ...] = HARD_PIVOT_MARKERS_EN + EMPHASIS_MARKERS_EN
 
 
 def _extract_contamination_terms(text: str) -> List[str]:
@@ -1659,16 +2014,28 @@ def _extract_contamination_terms(text: str) -> List[str]:
 
 
 def _find_active_context_index(sentences: List[str]) -> int:
+    """Return the index of the sentence that introduces the *current* task.
+
+    Only **hard** pivot markers ("现在 / 改成 / 换成 / now / instead" …)
+    count as task switches. Emphasis words like "核心是 / 重点是 / 不要"
+    appear inside coherent single-task requirements and must not be
+    treated as task pivots, otherwise contamination detection fires on
+    plain ``"核心是 X。不要 Y。"`` style inputs.
+
+    Returns ``-1`` when no hard pivot is present, so callers can decide
+    that the input is a single coherent task and skip cross-context
+    contamination analysis altogether.
+    """
     if not sentences:
-        return 0
+        return -1
     for idx in range(len(sentences) - 1, -1, -1):
         sent = sentences[idx]
         low = sent.lower()
-        if any(marker in sent for marker in PIVOT_MARKERS_ZH):
+        if any(marker in sent for marker in HARD_PIVOT_MARKERS_ZH):
             return idx
-        if any(marker in low for marker in PIVOT_MARKERS_EN):
+        if any(marker in low for marker in HARD_PIVOT_MARKERS_EN):
             return idx
-    return len(sentences) - 1
+    return -1
 
 
 def _detect_context_contamination(
@@ -1680,6 +2047,10 @@ def _detect_context_contamination(
         return []
 
     active_idx = _find_active_context_index(sentences)
+    if active_idx <= 0:
+        # No hard task-switch detected; treat the whole context as a
+        # single coherent task and skip cross-context contamination.
+        return []
     previous = sentences[:active_idx]
     if not previous:
         return []
@@ -1874,7 +2245,9 @@ def analyze_attention(
         requirements, coverages, attention_map, drift_level
     )
     levers = _build_control_levers(coverages, attention_map)
-    interrupt_level = _compute_interrupt(drift_level, coverages)
+    interrupt_level, interrupt_confidence, interrupt_evidence = (
+        _compute_interrupt(drift_level, coverages)
+    )
 
     notes: List[str] = [
         "本仪表盘显示的是任务注意力（用户要求 vs 输出回应）。",
@@ -1900,4 +2273,6 @@ def analyze_attention(
         output_trajectory=trajectory,
         control_levers=levers,
         interrupt_level=interrupt_level,
+        interrupt_confidence=interrupt_confidence,
+        interrupt_evidence=interrupt_evidence,
     )

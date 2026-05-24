@@ -347,6 +347,49 @@ def check_cli_and_tests(result: Result) -> None:
     code, output = run_command([sys.executable, "scripts/validate_benchmark.py"])
     result.check(code == 0 and "validation passed" in output, "benchmark validate passes", output[-1000:])
 
+    # Skill calibration: lock the human-vs-StateProbe agreement baseline
+    # and confirm known issues are still tracked transparently.
+    result.check(
+        exists("tests/fixtures/skill_cases.jsonl"),
+        "Skill calibration fixture exists",
+    )
+    code, output = run_command(
+        [sys.executable, "scripts/calibrate_skill.py"]
+    )
+    result.check(
+        code == 0 and "agreement rate" in output,
+        "Skill calibration script runs",
+        output[-1000:],
+    )
+    result.check(
+        "agreement rate (agree cases): 100.0%" in output,
+        "Skill calibration agree cases all match the human oracle",
+        output[-1000:],
+    )
+
+    # Lock the new evidence-driven schema fields on the preview tool so
+    # a refactor cannot silently drop confidence / evidence.
+    code, output = run_command([
+        sys.executable,
+        "-m",
+        "stateprobe.cli",
+        "skill",
+        "preview",
+        "--context-text",
+        "核心是让agent的注意力可见。不要把格式化当主线。",
+        "--plan-text",
+        "我准备重点写prompt检查器和格式化模板。",
+        "--json",
+    ])
+    result.check(
+        code == 0
+        and '"confidence"' in output
+        and '"evidence"' in output
+        and '"high"' in output,
+        "Skill preview JSON exposes confidence + evidence fields",
+        output[-1000:],
+    )
+
 
 def main() -> int:
     result = Result()

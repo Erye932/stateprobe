@@ -1187,7 +1187,9 @@ def _render_attention_hud(hud) -> None:
     summary.append(f"{hud.drift_level}", style=drift_style)
     summary.append(f"  ({hud.drift_score:.2f})\n", style="grey70")
     summary.append("Interrupt：", style="grey70")
-    summary.append(f"{interrupt_label}\n", style=interrupt_style)
+    summary.append(f"{interrupt_label}", style=interrupt_style)
+    summary.append("  Confidence：", style="grey70")
+    summary.append(f"{hud.interrupt_confidence}\n", style=interrupt_style)
     summary.append("已体现：", style="grey70")
     summary.append(str(len(hud.reflected)), style="bold green")
     summary.append("  弱体现：", style="grey70")
@@ -1201,6 +1203,16 @@ def _render_attention_hud(hud) -> None:
         title="StateProbe Skill · Agent Attention HUD",
         border_style="magenta",
     ))
+
+    if hud.interrupt_evidence:
+        ev = Text()
+        for line in hud.interrupt_evidence:
+            ev.append(f"- {line}\n", style="white")
+        console.print(Panel(
+            ev,
+            title="Interrupt Evidence · 为什么这么判",
+            border_style=interrupt_style,
+        ))
 
     if hud.core_focus:
         focus = Text()
@@ -1382,6 +1394,8 @@ def _render_attention_preview(preview, debug: bool = False) -> None:
         decision_text.append(decision.action, style=decision_style)
         decision_text.append("\nStop before output：", style="grey70")
         decision_text.append(str(decision.should_stop), style=decision_style)
+        decision_text.append("\nConfidence：", style="grey70")
+        decision_text.append(decision.confidence, style="cyan")
         decision_text.append("\nReason：", style="grey70")
         decision_text.append(decision.reason, style="white")
         decision_text.append("\nMessage：", style="grey70")
@@ -1389,6 +1403,9 @@ def _render_attention_preview(preview, debug: bool = False) -> None:
         if decision.blockers:
             decision_text.append("\nBlockers：", style="grey70")
             decision_text.append(", ".join(decision.blockers), style="yellow")
+        if decision.evidence:
+            decision_text.append("\nEvidence：", style="grey70")
+            decision_text.append(" / ".join(decision.evidence[:2]), style="white")
         console.print(Panel(
             decision_text,
             title="⓪ Activation Decision · Agent 下一步",

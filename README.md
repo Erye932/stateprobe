@@ -76,16 +76,44 @@ stateprobe demo
 
 `stateprobe skill preview` returns a JSON `activation_decision` — your agent host branches on it:
 
-| Action | Meaning |
-| --- | --- |
-| `continue` | Aligned. Agent can speak. |
-| `rewrite_planned_focus` | Plan misses user's actual must. **Don't ship.** Rewrite focus first. |
-| `ask_boundary_question` | Visual / creative ambiguity. **Ask the user one yes/no first.** |
-| `cut_context_contamination` | Agent is following stale context. **Cut the old direction first.** |
+| Action | Meaning | Stops the agent? |
+| --- | --- | --- |
+| `continue` | Aligned. Agent can speak. | No |
+| `continue_with_warning` | Risk signals exist, but evidence isn't strong enough for a hard stop. **Show the evidence; don't interrupt.** | No |
+| `rewrite_planned_focus` | Plan misses user's actual must, with concrete evidence. **Don't ship.** Rewrite focus first. | Yes |
+| `ask_boundary_question` | Visual / creative ambiguity. **Ask the user one yes/no first.** | Yes |
+| `cut_context_contamination` | Agent is following stale context. **Cut the old direction first.** | Yes |
+
+Every decision now ships with `confidence` (`low` / `medium` / `high`) and `evidence` — the concrete user requirements and gaps the decision was built on. **Destructive hard stops (`rewrite_planned_focus`, `cut_context_contamination`) only fire on `high` confidence.** `ask_boundary_question` can fire at `medium` because the cost is one user yes/no, not a rewrite. Everything weaker downgrades to `continue_with_warning` so StateProbe never destroys a workflow on a hunch. This is the contract that keeps the layer usable instead of a noisy referee.
 
 `stateprobe skill overlay` returns an `interrupt_level` (`ok` / `watch` / `interrupt`) plus `attention_gaps` and `control_levers` for the next turn.
 
 Full schemas: [Skill spec](https://github.com/Erye932/stateprobe/blob/main/docs/SKILL_ATTENTION_HUD.md), [MCP server](https://github.com/Erye932/stateprobe/blob/main/docs/MCP_SERVER.md).
+
+## What StateProbe is / is not
+
+**StateProbe is** a preflight attention HUD for agent workflows. It exposes — as structured control signals — what the agent is about to focus on, what it is about to ignore, and whether it is still attached to stale context, *before* the agent takes expensive actions (calls a tool, writes code, sends an email, renders an image).
+
+**StateProbe is not**:
+
+- **Not an oracle.** Rule-based judges have false positives and false negatives. That is why every verdict ships with `confidence` and `evidence`, and only `high` confidence ever stops an agent.
+- **Not a replacement for human or LLM review.** Review agents look at finished output. StateProbe looks at planned focus. They are complementary, not substitutes.
+- **Not a semantic correctness checker.** It does not know whether your code is right, whether your essay is true, or whether your design is good. It checks attention alignment, not domain truth.
+- **Not a "spin up another agent to judge this one" wrapper.** The whole point is that the default path is local, deterministic, zero-API-cost, and emits a structured `activation_decision` your host can branch on — not a paragraph of LLM critique.
+
+The honest one-line pitch: **low-cost, explainable, host-integratable attention preflight; not a referee, not a benchmark, not a guarantee**.
+
+## Known failure modes
+
+StateProbe will misjudge in these cases. The full list is in [`tests/fixtures/skill_cases.jsonl`](https://github.com/Erye932/stateprobe/blob/main/tests/fixtures/skill_cases.jsonl) (currently 19 documented `known_issue` cases out of 51 total). The recurring families:
+
+- **Paraphrase / antonym blindness.** `must_not 提缺点` violated by `列举需要改进的地方` — no lexical overlap, no concept lexicon, false negative.
+- **Avoidance-phrase false positive.** Plan `避免使用营销话术` literally contains the must_not keyword, so the matcher fires even though the intent is the opposite.
+- **Implicit-realisation false positive.** A drawing plan that captures `放松` via `闭眼微笑、背景柔和` is hard-stopped because the abstract concept word is not literally present.
+- **Modifier loss.** Plan covers the head must (`解释 RAG`) but loses a softer modifier (`面向新手`). Algorithm hard-stops; a human would warn.
+- **Plan-substance gaps.** A plan that is just `好的` or just a clarifying question soft-warns instead of hard-stopping.
+
+The fix path for each one is named in the fixture's `notes` field, not handwaved. None of them are blockers for the preflight contract; they are exactly the kinds of cases users will surface and grow the calibration suite around.
 
 ## Two product lines
 
@@ -127,10 +155,11 @@ DeepSeek-first, not DeepSeek-only — see [DeepSeek roadmap](https://github.com/
 
 ## Roadmap
 
-- **v0.3** *(current)* — Skill HUD, MCP server, Lab activation projection on 4 axes
-- **v0.3.1** — Remaining 4 axes; embedding contributor for offline fallback; VS Code / Cursor extension
-- **v0.4** — MoE expert routing contributor on DeepSeek-MoE
-- **v0.5** — Named steering vectors; output-time intervention API
+- **v0.3** — Skill HUD, MCP server, Lab activation projection on 4 axes
+- **v0.3.1** — Windows CLI encoding + launch demo polish
+- **v0.4** *(current)* — Evidence-driven `activation_decision`: every verdict ships `confidence` + `evidence`, only `high` confidence hard-stops, plus a 51-case hand-labelled calibration suite (32 agree / 19 transparently documented known issues) and the contamination / `must_not` / modality-gate fixes that go with it
+- **v0.4.x** — Close the documented known issues: antonym / paraphrase lexicon (ISSUE-005/006/020), modifier-aware coverage (ISSUE-001/009), plan-substance detection (ISSUE-012/018), more pivot markers (ISSUE-007); host feedback channel once user volume justifies it
+- **v0.5** — MoE expert routing contributor on DeepSeek-MoE; named steering vectors; output-time intervention API
 
 See [CHANGELOG](https://github.com/Erye932/stateprobe/blob/main/CHANGELOG.md) for the full version history.
 

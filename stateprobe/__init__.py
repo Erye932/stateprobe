@@ -10,7 +10,7 @@ Theoretical foundation:
   Reinforcement Learning" (arXiv:2501.12948, 2025)
 """
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 from stateprobe.models import (
     Axis,

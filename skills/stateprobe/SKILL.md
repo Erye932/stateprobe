@@ -94,11 +94,12 @@ echo '{"context":"<用户要求>","plan":"<计划写什么>"}' \
 | `activation_decision.action` | 怎么处理 |
 | --- | --- |
 | `continue` | 对齐 OK，开始写 |
+| `continue_with_warning` | 有风险但证据不够强。**不要打断工作流**；把 `evidence` 贴出来让用户/agent 自己决定是否调整 |
 | `rewrite_planned_focus` | 按 `next_steps` 改写 plan，再 preview |
 | `ask_boundary_question` | 把 `message` 抛给用户问，回答合并进 context，再 preview |
 | `cut_context_contamination` | 把残留的旧上下文从 plan 里砍掉，再 preview |
 
-`should_stop=true` 时**绝对不许**让 agent 继续输出。
+`should_stop=true` 时**绝对不许**让 agent 继续输出。只有 `confidence=high` 才会 hard stop；证据不够强的风险一律走 `continue_with_warning`，让 host 看到 evidence 但不会被打断。
 
 Python subprocess 集成示例：
 

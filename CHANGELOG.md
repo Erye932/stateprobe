@@ -2,6 +2,99 @@
 
 All notable changes to StateProbe will be documented in this file.
 
+## 0.4.0 - 2026-05-24 - Evidence-driven activation decision
+
+### Changed
+
+- `ActivationDecision` is now evidence-driven. Every decision exposes
+  `confidence` (`low` / `medium` / `high`) and `evidence` (the concrete
+  user requirements / gaps the decision was built on). Hard stops
+  (`should_stop=true`) are now restricted to `confidence=high`; risk
+  signals that lack strong evidence downgrade to a new
+  `continue_with_warning` action that surfaces the evidence to the host
+  without interrupting the agent. The Skill is no longer a binary
+  rule referee — it is a preflight that prefers warnings over false
+  hard stops, while keeping clear high-evidence interrupts intact.
+- README, Chinese README, `docs/SKILL_ATTENTION_HUD.md`,
+  `docs/MCP_SERVER.md`, and the agent host skill manifest now document
+  the `continue_with_warning` action plus the `confidence` / `evidence`
+  fields and the "only `high` confidence hard stops" contract.
+
+### Fixed
+
+- Context contamination detector no longer fires on single-task
+  contexts that contain emphasis or restriction markers like
+  `"核心是 X。不要 Y。"`. The pivot-marker list was split into
+  `HARD_PIVOT_MARKERS_*` (real task switches such as
+  `现在 / 改成 / instead`) and `EMPHASIS_MARKERS_*` (in-task emphasis
+  like `核心是 / 不要 / 重点是`). Only hard pivots trigger the "old
+  context vs. new context" split, eliminating a noisy evidence false
+  positive that undermined trust in the new evidence list.
+
+### Added
+
+- Skill calibration fixture, runner, and regressions:
+  - [`tests/fixtures/skill_cases.jsonl`](https://github.com/Erye932/stateprobe/blob/main/tests/fixtures/skill_cases.jsonl)
+    — 51 hand-labelled cases (32 `agree`, 19 `known_issue`). Covers
+    hard-stop misalignment, must_not violations (with concept→instance
+    expansions), context contamination, visual boundary questions,
+    text/code/email modality cases, English-only and mixed-language
+    inputs, edge cases (empty plans, single-word plans), and
+    regression locks for each shipped fix.
+  - [`scripts/calibrate_skill.py`](https://github.com/Erye932/stateprobe/blob/main/scripts/calibrate_skill.py)
+    — prints agreement rate + the transparent known-issues list.
+  - [`tests/test_calibration.py`](https://github.com/Erye932/stateprobe/blob/main/tests/test_calibration.py)
+    — agree cases must keep matching the oracle; known issues must
+    keep matching their documented current behaviour, so any silent
+    improvement or regression forces a deliberate fixture update.
+  - [`docs/SKILL_CALIBRATION.md`](https://github.com/Erye932/stateprobe/blob/main/docs/SKILL_CALIBRATION.md)
+    documents the workflow, fixture schema, and how to graduate a
+    known issue into an `agree` case.
+- `AttentionHUD` (overlay path) now exposes `interrupt_confidence`
+  and `interrupt_evidence`, mirroring the preview-side
+  `activation_decision` contract. The `interrupt_level` only escalates
+  to `interrupt` on `confidence=high` *and* a non-empty evidence list;
+  weaker signals downgrade to `watch`. The CLI overlay panel renders
+  a dedicated **Interrupt Evidence** block so users see *why*
+  StateProbe paused the agent post-output, not just *that* it did.
+
+### Improved (partial fixes for documented known issues)
+
+These do not close their issue, but each one demonstrably shrinks the
+gap. The fixture's `actual` block records the new behaviour and the
+notes record what is still missing.
+
+- **Core-keyword coverage scoring.** Coverage is now computed against
+  *core* trigrams (no Chinese function-word characters at any
+  position) when at least 3 are available. This stops the n-gram
+  denominator from drowning out concept hits — e.g. a plan that
+  legitimately covers `注意力` no longer gets diluted to `1/27` by
+  stopword-glued bigrams. ISSUE-001 moved from a high-confidence hard
+  stop to a medium-confidence boundary question.
+- **`must_not` concept→instance expansion.** A small, conservative
+  `MUST_NOT_EXPANSIONS` table maps phrases like `第三方库` /
+  `废弃 API` to their concrete instances (`numpy`, `pandas`,
+  `deprecated`, …). Plans that violate a category-level restriction
+  by naming a specific instance now hard-stop with an explicit
+  rewrite. ISSUE-002 graduated to `HARD-005` (agree).
+- **Task-modality gate.** `_detect_literalization` now skips
+  unambiguously text-only tasks (email, document, code, summary…) so
+  verbs like `写` no longer fire a "do you really want to render this
+  on a canvas?" question on `写邮件` / `写函数`. ISSUE-003 moved from
+  a spurious visual boundary question to a (still-overstated) soft
+  warning.
+
+### Tests
+
+- `tests/test_skill.py` adds three regressions that lock the new
+  contract: hard stops must always carry concrete evidence + high
+  confidence, medium-risk borderline signals must never produce a
+  hard stop, and single-task `"核心是 X。不要 Y。"` contexts must
+  not produce contamination evidence.
+- `scripts/acceptance_check.py` now runs the calibration script,
+  asserts 100% agreement on the agree cases, and verifies the live
+  Skill preview JSON exposes the new `confidence` / `evidence` fields.
+
 ## 0.3.1 - 2026-05-23 - Windows CLI encoding and launch demo polish
 
 ### Fixed

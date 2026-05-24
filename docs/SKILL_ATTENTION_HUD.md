@@ -51,11 +51,27 @@ stateprobe skill preview \
 其中最重要的是 `activation_decision`。host 不需要自己猜该怎么办，直接按它的 `action` 分支：
 
 - `continue`：理解基本对齐，可以继续。
-- `rewrite_planned_focus`：计划已经偏了，先按 `opening_patch` 重写，再输出。
+- `continue_with_warning`：发现了风险信号，但证据不够强，不硬拦。host 应该把 `evidence` 暴露给用户/agent，但不要打断工作流。
+- `rewrite_planned_focus`：计划已经偏了，且证据具体。先按 `opening_patch` 重写，再输出。
 - `ask_boundary_question`：边界不清楚，先把问题抛给用户确认。
 - `cut_context_contamination`：被旧上下文带偏了，先砍掉旧方向，再回到用户最新要求。
 
-它还带 `should_stop`、`reason`、`message`、`blockers`、`next_steps`，方便 host 直接执行，不用重新从其他字段里推断控制流。
+它还带 `should_stop`、`confidence`、`reason`、`message`、`blockers`、`evidence`、`next_steps`，方便 host 直接执行，不用重新从其他字段里推断控制流。
+
+### Evidence-driven contract
+
+StateProbe Skill 不是 oracle。每条 `activation_decision` 都带：
+
+- `confidence`：`low` / `medium` / `high`，表明这条决策有多确定。
+- `evidence`：具体的命中证据——用户哪条要求、plan 哪里漏了、上下文里哪段被旧任务污染了。
+
+硬契约：
+
+- **`should_stop=true` 只在 `confidence=high` 时触发**。证据不够强时，决策会自动降级成 `continue_with_warning`，让 host 看到风险但不会被打断。
+- 所有 hard stop 都必须有 `evidence`，host 可以直接展示给用户解释「为什么停」。
+- `continue` / `continue_with_warning` 都不会阻塞 agent，只有 `should_stop=false` 才允许 agent 继续输出。
+
+这条契约的目的：**规则永远会有误判**。StateProbe 选择的策略是宁可让 host 看到 warning，也不主动打断真实工作流；硬拦只用在证据很强的情况上。
 
 对画图 / 视频生成任务，下面这些边界字段最重要：
 
@@ -103,10 +119,12 @@ Agent host 应该默认走“写之前先 preview”的流程：
 3. 正式写或生成之前，调用 `stateprobe skill preview` 或 MCP 的 `stateprobe_preview_attention`。
 4. 按 `activation_decision.action` 分支：
    - `continue`：开始输出。
+   - `continue_with_warning`：可以输出，但先读一下 `activation_decision.evidence`，必要时提示用户。
    - `rewrite_planned_focus`：应用 `next_steps`，重写计划，再跑一次 preview。
    - `ask_boundary_question`：把 `activation_decision.message` 问给用户，把回答合并回 `context`，必要时再跑 preview。
    - `cut_context_contamination`：从当前计划里删掉旧上下文残留，重新对准用户最新要求。
 5. 只要 `activation_decision.should_stop` 是 `true`，host 就不应该让 agent 继续输出用户可见内容。
+6. 不要把 `continue_with_warning` 当成 `rewrite`。它代表“有中等证据，但不足以硬拦”；host 可以选择重试 / 记录 / 提醒用户，但不要默认杀掉本轮输出。
 
 Minimal host instruction:
 
@@ -114,6 +132,8 @@ Minimal host instruction:
 在正式回答、画图、生成视频之前，先用当前用户要求和你的 planned_focus 跑 StateProbe preview。
 读取 activation_decision.action，并按 next_steps 执行。
 activation_decision.should_stop 为 true 时，不要输出用户可见内容。
+activation_decision.action 是 continue_with_warning 时，不要打断工作流；
+把 activation_decision.evidence 暴露给用户/agent，让他们自己决定是否调整。
 ```
 
 写完之后跑 `overlay` 时，可以直接传用户要求和 agent 实际输出：
@@ -254,6 +274,15 @@ Windows PowerShell 管道 JSON 时可能受 shell 编码影响。如果直接管
   - `ok`：可以继续
   - `watch`：可以写完当前段，但下一轮要纠偏
   - `interrupt`：现在就停，先应用 `control_levers` 再重启
+- `interrupt_confidence`：`"low"` | `"medium"` | `"high"`。
+  和 preview 路径的 `activation_decision.confidence` 同语义：只有
+  `high` + 非空 `interrupt_evidence` 才会出 `interrupt`；更弱的信号
+  会被自动降级为 `watch`。host 不应该在 `medium` / `low` confidence
+  下硬停 agent。
+- `interrupt_evidence`：人类可读的证据列表，列出究竟为什么 StateProbe
+  想暂停 agent。例如 `"违反 must_not：不要顺便推销新功能；agent 输出
+  命中禁止词：功能升级"`。host 应当把这条 evidence 透传给用户，让用户
+  自己判断要不要采纳，而不是把"interrupt"当神谕。
 
 ## Agent 集成方式
 
