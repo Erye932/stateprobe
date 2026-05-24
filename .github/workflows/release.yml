@@ -1,0 +1,83 @@
+name: GitHub Release
+
+# Creates / updates a GitHub Release for a tag.
+#
+# Two triggers:
+#   1. push to a v* tag — fires automatically alongside publish.yml. Future
+#      releases (v0.4.1, v0.5.0, ...) become fully hands-free: tag push
+#      ships PyPI AND creates a GitHub Release with notes drawn from
+#      CHANGELOG.md plus the wheel + sdist as downloadable assets.
+#   2. workflow_dispatch — lets a maintainer back-fill / re-run the release
+#      from the Actions UI for an existing tag without touching PyPI. Used
+#      to back-fill v0.4.0 the first time this workflow lands.
+#
+# Uses the workflow's built-in GITHUB_TOKEN (scoped to this repo, expires
+# at job end). Maintainers never need to manage a personal access token.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to back-fill (e.g. v0.4.0)"
+        required: true
+        type: string
+
+jobs:
+  release:
+    name: Build artifacts and publish GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # needed to create the Release and upload assets
+
+    steps:
+      - name: Resolve tag
+        id: tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.name }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade build twine
+
+      - name: Build sdist + wheel
+        run: python -m build
+
+      - name: Verify artifacts
+        run: python -m twine check dist/*
+
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        shell: bash
+        run: |
+          python scripts/extract_changelog_section.py "${{ steps.tag.outputs.name }}" \
+            > release_notes.md
+          echo "--- release_notes.md (first 40 lines) ---"
+          head -n 40 release_notes.md
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: "StateProbe ${{ steps.tag.outputs.name }}"
+          body_path: release_notes.md
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+          draft: false
+          prerelease: false
+          make_latest: "true"
