@@ -43,9 +43,22 @@ jobs:
             echo "name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@v4
+      - name: Checkout tag for build and CHANGELOG
+        uses: actions/checkout@v4
         with:
           ref: ${{ steps.tag.outputs.name }}
+
+      # Tags older than this workflow predate scripts/extract_changelog_section.py,
+      # so always pull the helper from main into a side directory. Build artifacts
+      # still come from the tag's tree above; only the tooling is fetched from main.
+      - name: Checkout release tooling from main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: _tooling
+          sparse-checkout: |
+            scripts/extract_changelog_section.py
+          sparse-checkout-cone-mode: false
 
       - uses: actions/setup-python@v5
         with:
@@ -64,8 +77,8 @@ jobs:
         id: notes
         shell: bash
         run: |
-          python scripts/extract_changelog_section.py "${{ steps.tag.outputs.name }}" \
-            > release_notes.md
+          python _tooling/scripts/extract_changelog_section.py \
+            "${{ steps.tag.outputs.name }}" > release_notes.md
           echo "--- release_notes.md (first 40 lines) ---"
           head -n 40 release_notes.md
 
