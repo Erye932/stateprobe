@@ -120,7 +120,7 @@ class LabVectorStore:
                 f"LabVectorStore file not found: {path}. "
                 f"Build with: python scripts/build_lab_vectors.py"
             )
-        payload = torch.load(str(path_obj), map_location="cpu", weights_only=False)
+        payload = torch.load(str(path_obj), map_location="cpu", weights_only=True)
         version = payload.get("schema_version", 0)
         if version > SCHEMA_VERSION:
             raise RuntimeError(

@@ -117,6 +117,7 @@ class LabContributor:
         lazy: bool = True,
         min_confidence: float = MIN_LAB_CONFIDENCE,
         allow_cpu: bool = False,
+        trust_remote_code: bool = False,
     ):
         """
         Args:
@@ -130,6 +131,9 @@ class LabContributor:
             min_confidence:  Sources with |raw_score| below this are dropped.
             allow_cpu:       Permit CPU fallback (tests only — production is
                              too slow on CPU).
+            trust_remote_code: Allow executing code from HF model repos.
+                             Defaults to False for security. Set to True
+                             only for models that require custom code.
 
         Raises:
             EngineUnavailable: vectors file missing, store schema mismatch,
@@ -144,6 +148,7 @@ class LabContributor:
         self.device = device
         self.min_confidence = min_confidence
         self.allow_cpu = allow_cpu
+        self.trust_remote_code = trust_remote_code
 
         # Heavy resources (loaded on demand):
         self._store: Any = None
@@ -282,6 +287,7 @@ class LabContributor:
             model, tokenizer, resolved_device = load_model_and_tokenizer(
                 model_name=self.model_name,
                 device=self.device,
+                trust_remote_code=self.trust_remote_code,
             )
         except Exception as exc:
             raise EngineUnavailable(
