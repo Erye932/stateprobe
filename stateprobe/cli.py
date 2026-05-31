@@ -2061,6 +2061,12 @@ def lab_explain() -> None:
     default=False,
     help="允许 transformers 从 Hugging Face 下载模型权重。",
 )
+@click.option(
+    "--trust-remote-code",
+    is_flag=True,
+    default=False,
+    help="允许执行 HF 模型仓库中的自定义代码。仅在模型要求时使用。",
+)
 def lab_probe(
     prompt: Optional[str],
     file_path: Optional[str],
@@ -2069,6 +2075,7 @@ def lab_probe(
     layer: int,
     device: Optional[str],
     allow_download: bool,
+    trust_remote_code: bool,
 ) -> None:
     """用 DeepSeek-R1-Distill hidden_states 投影测量 prompt。"""
     text = _read_prompt(prompt, file_path)
@@ -2088,6 +2095,7 @@ def lab_probe(
                 model_name=model_name,
                 device=device,
                 local_files_only=not allow_download,
+                trust_remote_code=trust_remote_code,
             )
     except RuntimeError as exc:
         raise click.ClickException(str(exc)) from exc

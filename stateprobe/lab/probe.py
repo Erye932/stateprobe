@@ -107,6 +107,7 @@ def load_model_and_tokenizer(
     model_name: str = DEFAULT_DEEPSEEK_MODEL,
     device: Optional[str] = None,
     local_files_only: bool = False,
+    trust_remote_code: bool = False,
 ):
     require_lab_dependencies()
     import torch
@@ -120,7 +121,7 @@ def load_model_and_tokenizer(
 
     tokenizer = AutoTokenizer.from_pretrained(
         resolved,
-        trust_remote_code=True,
+        trust_remote_code=trust_remote_code,
         local_files_only=local_files_only,
     )
     # `dtype=` replaces the deprecated `torch_dtype=` in transformers >= 5.0.
@@ -129,7 +130,7 @@ def load_model_and_tokenizer(
     try:
         model = AutoModelForCausalLM.from_pretrained(
             resolved,
-            trust_remote_code=True,
+            trust_remote_code=trust_remote_code,
             dtype=dtype,
             local_files_only=local_files_only,
         )
@@ -137,7 +138,7 @@ def load_model_and_tokenizer(
         # transformers < 5.0 uses torch_dtype.
         model = AutoModelForCausalLM.from_pretrained(
             resolved,
-            trust_remote_code=True,
+            trust_remote_code=trust_remote_code,
             torch_dtype=dtype,
             local_files_only=local_files_only,
         )

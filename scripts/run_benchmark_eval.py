@@ -45,7 +45,15 @@ def call_deepseek(prompt: str) -> str:
             return data["choices"][0]["message"]["content"].strip()
     except urllib.error.HTTPError as e:
         error_body = e.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"DeepSeek API error {e.code}: {error_body}") from e
+        # Mask any key-shaped sequences to prevent leaking the API key
+        # in error messages (mirrors eval/client.py's _mask_secrets).
+        import re
+        safe_body = error_body
+        if API_KEY and len(API_KEY) >= 8:
+            safe_body = safe_body.replace(API_KEY, "****")
+        safe_body = re.sub(r"Bearer\s+[A-Za-z0-9_\-]{8,}", "Bearer ****", safe_body)
+        safe_body = re.sub(r"sk-[A-Za-z0-9_\-]{8,}", "sk-****", safe_body)
+        raise RuntimeError(f"DeepSeek API error {e.code}: {safe_body[:500]}") from e
 
 
 def main() -> int:
