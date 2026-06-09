@@ -5,11 +5,13 @@
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![Tests](https://github.com/Erye932/stateprobe/actions/workflows/ci.yml/badge.svg)](https://github.com/Erye932/stateprobe/actions/workflows/ci.yml)
 
-> **The attention layer for LLM agents.**
+> **A runtime state firewall for AI agents.**
 
-Your agent already drifted — wrong focus, stale context, confidently editing files you never asked about. StateProbe catches it **before** the agent ships the answer. Works with **Claude Code**, **Cursor**, **Cline**, **Continue**, and any MCP host.
+AI agents are moving from chat to execution: writing code, calling tools, editing files, touching data, and shipping changes. The dangerous failures often start **before** the tool call: the agent has already locked onto the wrong task, followed stale context, become too agreeable, or entered an unreliable behavior state.
 
-For closed-source agents, this is fast task-level attention inferred from text. Open-weight models unlock the optional Lab / future Runtime Probe path for activations and vectors.
+StateProbe is the control layer that catches that drift **before execution**. Today it ships as a local CLI / MCP preflight for agent workflows. The long-term line is deeper: activation vectors, emotion/persona vectors, and MoE routing signals for open-weight model runtime control.
+
+Works with **Claude Code**, **Cursor**, **Cline**, **Continue**, and any MCP host.
 
 English | [简体中文](https://github.com/Erye932/stateprobe/blob/main/README.zh-CN.md)
 
@@ -21,13 +23,32 @@ English | [简体中文](https://github.com/Erye932/stateprobe/blob/main/README.
 
 ## Why
 
-LLM agents drift. They miss the user's actual point, get steered by stale context, or burn cycles on the wrong subtopic. Today's fix is "rewrite the prompt and pray." StateProbe gives you a sharper tool:
+LLM observability mostly tells you what happened after the model answered or after the agent called tools. That is useful, but late. In production agent systems, the expensive failure is often earlier:
 
-- **See** what the agent is about to focus on, before it answers
-- **Decide** to continue, rewrite the focus, ask a boundary question, or cut stale context
-- **Audit** the actual output afterwards and surface drift
+- The user asks for analysis; the agent starts editing files.
+- The latest instruction pivots; the agent keeps following old context.
+- The agent is about to call a tool while missing a hard constraint.
+- A model upgrade changes sycophancy, confidence, or reasoning-budget behavior.
+
+StateProbe gives the host a decision point before damage:
+
+- **Detect** planned attention drift before the agent speaks or executes
+- **Branch** into continue, warning, rewrite, boundary question, or context cut
+- **Audit** the output afterwards and build a calibration trail
+- **Extend** toward open-weight runtime probes when model internals are available
 
 Runs **locally**. Costs **zero LLM tokens** by default. Plugs into any MCP host.
+
+## Why not just ask the model to check itself?
+
+Because self-reflection keeps the judge inside the same unstable system.
+
+- A drifting model may not know it is drifting.
+- A self-check is still text-level and can be contaminated by the same prompt/context.
+- A second LLM judge adds latency, cost, and another nondeterministic dependency.
+- Enterprise teams need a consistent control signal across agents, prompts, model versions, and deployments.
+
+StateProbe's default layer is an external, deterministic preflight. For open-weight models, the long-term Runtime Probe line moves below text into hidden states, persona/emotion vectors, and MoE routing signals.
 
 ## Install
 
@@ -90,9 +111,23 @@ Every decision now ships with `confidence` (`low` / `medium` / `high`) and `evid
 
 Full schemas: [Skill spec](https://github.com/Erye932/stateprobe/blob/main/docs/SKILL_ATTENTION_HUD.md), [MCP server](https://github.com/Erye932/stateprobe/blob/main/docs/MCP_SERVER.md).
 
+## Current wedge, long-term control plane
+
+StateProbe is deliberately staged:
+
+| Stage | Status | What it proves |
+| --- | --- | --- |
+| **Open-source MCP / CLI** | Shipped | Agent drift can be caught before output/tool execution without another LLM call. |
+| **Skill HUD** | Shipped | Hosts can branch on structured `activation_decision` instead of reading paragraphs of critique. |
+| **Lab activation projection** | Experimental | Open-weight model activations can be projected onto behavior/persona axes. |
+| **Team dashboard** | Planned | Teams need a record of drift cases, prompt versions, risk trends, and calibration decisions. |
+| **Enterprise Runtime Probe** | Planned / placeholder | Open-weight model operators need hidden-state, router-trace, and output-state reports in production. |
+
+The commercial shape is not "another prompt tool." The wedge is open-source developer adoption; the product is an agent runtime control plane for teams that run high-permission agents or open-weight models.
+
 ## What StateProbe is / is not
 
-**StateProbe is** a preflight attention HUD for agent workflows. It exposes — as structured control signals — what the agent is about to focus on, what it is about to ignore, and whether it is still attached to stale context, *before* the agent takes expensive actions (calls a tool, writes code, sends an email, renders an image).
+**StateProbe is** a runtime state firewall for agent workflows. It exposes — as structured control signals — what the agent is about to focus on, what it is about to ignore, and whether it is still attached to stale context, *before* the agent takes expensive actions (calls a tool, writes code, sends an email, renders an image).
 
 **StateProbe is not**:
 
@@ -100,8 +135,9 @@ Full schemas: [Skill spec](https://github.com/Erye932/stateprobe/blob/main/docs/
 - **Not a replacement for human or LLM review.** Review agents look at finished output. StateProbe looks at planned focus. They are complementary, not substitutes.
 - **Not a semantic correctness checker.** It does not know whether your code is right, whether your essay is true, or whether your design is good. It checks attention alignment, not domain truth.
 - **Not a "spin up another agent to judge this one" wrapper.** The whole point is that the default path is local, deterministic, zero-API-cost, and emits a structured `activation_decision` your host can branch on — not a paragraph of LLM critique.
+- **Not a finished enterprise control plane yet.** The shipped line is the Skill HUD. Runtime Probe, dashboard, access control, audit log, and deployment story are the next product line, not a claim of current production support.
 
-The honest one-line pitch: **low-cost, explainable, host-integratable attention preflight; not a referee, not a benchmark, not a guarantee**.
+The honest one-line pitch: **execution-time drift prevention today; open-weight runtime state control tomorrow**.
 
 ## Known failure modes
 
@@ -132,8 +168,9 @@ The fix path for each one is named in the fixture's `notes` field, not handwaved
 | Analyzes | Output quality | Output safety | Call traces | **Agent's planned attention before output** |
 | When | After release | Runtime | Production | **Before each turn** |
 | LLM API needed | Yes | Yes | Yes | **No (default)** |
+| Open-weight internals | No | No | No | **Planned Runtime Probe path** |
 
-Complementary, not competitive. promptfoo / Guardrails check what came out; StateProbe shapes what's about to come out.
+Complementary, not competitive. promptfoo / Guardrails check what came out; LangSmith-style tools show what happened; StateProbe tries to stop the wrong thing from happening in the first place.
 
 ## Architecture
 

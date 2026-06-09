@@ -5,11 +5,13 @@
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![Tests](https://github.com/Erye932/stateprobe/actions/workflows/ci.yml/badge.svg)](https://github.com/Erye932/stateprobe/actions/workflows/ci.yml)
 
-> **LLM agent 的注意力控制层。**
+> **AI Agent 的运行时状态防火墙。**
 
-StateProbe 让你在 agent 把答案甩出去之前，**直接干预模型注意力**——看清它要谈什么、用户真正要什么是否对得上，决定继续、重写、追问还是切断旧上下文。无缝接入 Claude Code、Cursor、Cline、Continue，以及任何 MCP host。
+AI Agent 正在从聊天助手变成执行系统：写代码、调工具、改文件、碰数据、自动完成任务。真正危险的失败，往往不是输出后才发生，而是在执行前就已经开始了：agent 抓错重点、跟着旧上下文跑、过度迎合用户，或者进入了不可靠的行为状态。
 
-闭源 agent 上，这是从文本推断出来的高速任务层注意力；开源模型会解锁可选的 Lab / 未来 Runtime Probe 路线，继续往 activations 和 vectors 深挖。
+StateProbe 要做的是在执行前拦住这种漂移。当前版本已经交付本地 CLI / MCP 预检层；长期路线是面向开源模型的运行时控制：激活向量、情绪/人格向量、MoE 路由信号，以及未来的 Runtime Probe。
+
+无缝接入 Claude Code、Cursor、Cline、Continue，以及任何 MCP host。
 
 [English](https://github.com/Erye932/stateprobe/blob/main/README.md) | 简体中文
 
@@ -21,15 +23,32 @@ StateProbe 让你在 agent 把答案甩出去之前，**直接干预模型注意
 
 ## 为什么需要这个
 
-LLM agent 经常跑偏：抓错重点、被旧上下文牵走、把力气花在用户没问的方向。今天大家的解法是「重写 prompt 然后祈祷」。StateProbe 给你更锋利的工具：
+今天很多 LLM observability 工具是在事后看 trace、看 output、看评分。这些有价值，但太晚。生产级 Agent 真正贵的失败常常发生在更早的地方：
 
-- **看清** agent 在张嘴前打算谈什么
-- **判断** 它该继续、重写、追问，还是切断旧上下文
-- **复盘** 实际输出是不是真的围绕用户重点
+- 用户要求先分析，agent 直接开始改文件。
+- 用户已经切换任务，agent 还在跟旧上下文走。
+- agent 准备调工具，但漏掉了硬约束。
+- 模型升级后，迎合、自信、推理预算突然变了。
+
+StateProbe 给 host 一个执行前决策点：
+
+- **检测** agent 在输出或调工具前的 planned attention 有没有跑偏
+- **分支** 到继续、警告、重写、追问、切断旧上下文
+- **复盘** 实际输出并积累校准证据
+- **延展** 到开源模型的 hidden states、情绪/人格向量、MoE routing
 
 **本地运行**。默认**零 LLM 调用**。任何 MCP host 都能接。
 
-> 这就是「**模型罗盘**」的含义：在直接打洞挖答案之前，先望气、先分金；看清这次问题在模型里激活了什么，再决定怎么发。
+## 为什么不是让模型自己反思？
+
+因为自我反思还是把裁判放在同一个不稳定系统里。
+
+- 模型正在跑偏时，未必知道自己在跑偏。
+- 自查仍然是文本层，仍然会被同一段 prompt / 上下文污染。
+- 再调一个 LLM judge 会增加成本、延迟和另一个不稳定依赖。
+- 企业需要跨 agent、跨 prompt、跨模型版本的稳定控制信号。
+
+StateProbe 的默认层是外部、确定、本地的 preflight。开源模型可控时，下一步才进入更深的 Runtime Probe：hidden states、情绪/人格向量、MoE 路由信号。
 
 ## 安装
 
@@ -133,11 +152,23 @@ stateprobe demo
 
 **边界**：Skill HUD 不声称神经可解释性；它是从文本里重建并控制任务层注意力。闭源 API（OpenAI、Claude）拿不到 hidden states——对它们，StateProbe 只跑文本层 Skill。开源模型（DeepSeek、Qwen、Llama）才解锁今天的 Lab 路线和未来 Runtime Probe。
 
-> 一句话区分：**闭源模型上是望气；开源模型上能分金**。
+## 当前楔子和长期终局
+
+StateProbe 不是又一个 prompt 小工具，而是分阶段走向 Agent runtime control plane：
+
+| 阶段 | 状态 | 证明什么 |
+| --- | --- | --- |
+| **开源 CLI / MCP** | 已交付 | 不额外调用 LLM，也能在 agent 输出/执行前抓到一部分漂移。 |
+| **Skill HUD** | 已交付 | host 可以按结构化 `activation_decision` 分支，而不是读一段 LLM 评语。 |
+| **Lab 激活投影** | 实验性 | 开源模型的 activations 可以投影到行为/人格轴上。 |
+| **团队看板** | 计划中 | 团队需要记录跑偏案例、prompt 版本、风险趋势和校准决策。 |
+| **Enterprise Runtime Probe** | 计划中 / 占位 | 开源模型平台需要 hidden-state、router-trace、output-state report 和审计控制。 |
+
+商业化形态不是“卖一个 prompt 检查器”。开源工具是入口，长期产品是给高权限 Agent 和开源模型团队用的运行时状态控制层。
 
 ## 这是什么、不是什么
 
-**StateProbe 是** agent 工作流里的 **preflight**：在 agent 真正动手前（调工具、写代码、发邮件、出图），把它准备关注什么、忽略了什么、有没有被旧上下文带偏，用结构化控制信号暴露出来。它是一份你这一次问题专属的注意力切片。
+**StateProbe 是** agent 工作流里的 **runtime state firewall**：在 agent 真正动手前（调工具、写代码、发邮件、出图），把它准备关注什么、忽略了什么、有没有被旧上下文带偏，用结构化控制信号暴露出来。它是一份你这一次任务专属的执行前状态切片。
 
 **StateProbe 不是**：
 
@@ -148,8 +179,9 @@ stateprobe demo
 - **不是 prompt 优化魔法**（咒语优化没有可复现证据，本项目不押注那条路）。
 - **不是又一个 prompt 模板库 / SOP 生成器 / 正则 prompt 检查器**。
 - **不是替代提示词工程**——是它的一个分支，用证据代替体感。
+- **不是已经完成的企业控制台**。当前交付的是 Skill HUD；Runtime Probe、团队看板、权限、审计日志和部署方案是下一条产品线，不是已经完成的生产能力。
 
-一句话定位：**低成本、可解释、可接进 agent host 的注意力 preflight；不当裁判、不当 benchmark、不当保证**。
+一句话定位：**今天做执行前漂移预防，明天做开源模型运行时状态控制。**
 
 ## 已知误判模式
 
@@ -170,8 +202,9 @@ StateProbe 一定会在下面这些情况判错。完整清单在 [`tests/fixtur
 | 分析对象 | 输出质量 | 输出安全 | 调用链路 | **agent 输出前的 planned attention** |
 | 何时用 | 发布后评测 | 运行时拦截 | 监控调试 | **每轮发话前** |
 | 需要 LLM API？ | 是 | 是 | 是 | **不需要（默认）** |
+| 开源模型内部状态 | 否 | 否 | 否 | **Runtime Probe 路线** |
 
-互补，不竞争。promptfoo / Guardrails 检查已经发出来的；StateProbe 塑造将要发出来的。
+互补，不竞争。promptfoo / Guardrails 检查已经发出来的；LangSmith 类工具告诉你发生了什么；StateProbe 试图在错误发生前拦住它。
 
 ## 架构
 
