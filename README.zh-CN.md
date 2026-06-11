@@ -48,7 +48,7 @@ StateProbe 给 host 一个执行前决策点：
 - 再调一个 LLM judge 会增加成本、延迟和另一个不稳定依赖。
 - 企业需要跨 agent、跨 prompt、跨模型版本的稳定控制信号。
 
-StateProbe 的默认层是外部、确定、本地的 preflight。开源模型可控时，下一步才进入更深的 Runtime Probe：hidden states、情绪/人格向量、MoE 路由信号。
+StateProbe 当前的 Skill 层是外部、确定、本地的 preflight：它会从本轮用户上下文里动态抽取要求，生成用户意图图，再和 agent 的 planned focus 对齐，最后输出结构化控制决策。它不是固定规则库扫一遍 prompt。开源模型可控时，下一步才进入更深的 Runtime Probe：hidden states、情绪/人格向量、MoE 路由信号。
 
 ## 安装
 
@@ -136,7 +136,7 @@ stateprobe demo
 | `ask_boundary_question` | 视觉/创意有歧义。**先问用户一个 yes/no**，再继续 | 是 |
 | `cut_context_contamination` | agent 在跟旧上下文走。**先切掉旧方向** | 是 |
 
-每条决策都带 `confidence`（`low` / `medium` / `high`）和 `evidence`——具体命中了哪条用户要求、漏了什么。**有破坏性的硬停（`rewrite_planned_focus`、`cut_context_contamination`）只在 `high` confidence 下触发**；`ask_boundary_question` 在 `medium` 也能触发——它的代价只是问用户一句 yes/no，不会改写计划。再弱的信号一律降级成 `continue_with_warning`，避免规则一拍脑袋就打断 agent。这条契约让 StateProbe 是可信的注意力外挂，不是规则裁判。
+每条决策都带 `confidence`（`low` / `medium` / `high`）和 `evidence`——具体命中了哪条用户要求、漏了什么。**有破坏性的硬停（`rewrite_planned_focus`、`cut_context_contamination`）只在 `high` confidence 下触发**；`ask_boundary_question` 在 `medium` 也能触发——它的代价只是问用户一句 yes/no，不会改写计划。再弱的信号一律降级成 `continue_with_warning`，避免确定性文本判断一拍脑袋就打断 agent。这条契约让 StateProbe 是可信的注意力外挂，不是规则裁判。
 
 `stateprobe skill overlay` 返回 `interrupt_level`（`ok` / `watch` / `interrupt`）+ `attention_gaps` + `control_levers`，告诉你下一轮怎么纠。
 
@@ -159,7 +159,7 @@ StateProbe 不是又一个 prompt 小工具，而是分阶段走向 Agent runtim
 | 阶段 | 状态 | 证明什么 |
 | --- | --- | --- |
 | **开源 CLI / MCP** | 已交付 | 不额外调用 LLM，也能在 agent 输出/执行前抓到一部分漂移。 |
-| **Skill HUD** | 已交付 | host 可以按结构化 `activation_decision` 分支，而不是读一段 LLM 评语。 |
+| **Skill HUD** | 已交付 | 从本轮上下文动态抽取用户要求，和 planned focus 对齐；host 可以按结构化 `activation_decision` 分支，而不是读一段 LLM 评语。 |
 | **Lab 激活投影** | 实验性 | 开源模型的 activations 可以投影到行为/人格轴上。 |
 | **团队看板** | 计划中 | 团队需要记录跑偏案例、prompt 版本、风险趋势和校准决策。 |
 | **Enterprise Runtime Probe** | 计划中 / 占位 | 开源模型平台需要 hidden-state、router-trace、output-state report 和审计控制。 |
@@ -172,7 +172,7 @@ StateProbe 不是又一个 prompt 小工具，而是分阶段走向 Agent runtim
 
 **StateProbe 不是**：
 
-- **不是 oracle**。规则裁判一定有误报漏报。所以每条判决都带 `confidence` + `evidence`，**只有 `high` confidence 才会真的硬停 agent**。
+- **不是 oracle**。确定性文本判断一定有误报漏报。所以每条判决都带 `confidence` + `evidence`，**只有 `high` confidence 才会真的硬停 agent**。
 - **不是人工 / LLM review 的替代品**。review 看的是已经写完的东西，StateProbe 看的是 agent 准备关注什么。互补，不是替代。
 - **不是语义正确性检查**。它判断不了你的代码对不对、论点对不对、设计好不好。它只判断注意力对没对齐——领域真伪不是它的活。
 - **不是「再开一个 agent 来当裁判」的封装**。重点是默认路径**本地、确定、零 API 成本**，给出可分支的 `activation_decision`，而不是一段 LLM 评语。
@@ -208,7 +208,7 @@ StateProbe 一定会在下面这些情况判错。完整清单在 [`tests/fixtur
 
 ## 架构
 
-v0.2 起 StateProbe 采用 **hybrid evidence 架构**（[ADR_009](https://github.com/Erye932/stateprobe/blob/main/docs/adr/009-hybrid-engine.md)）：多个证据贡献者并行观察 prompt，各自发出带 confidence 的证据，统一聚合到 8 个轴的读数。
+v0.2 起 StateProbe 采用 **hybrid evidence 架构**（[ADR_009](https://github.com/Erye932/stateprobe/blob/main/docs/adr/009-hybrid-engine.md)）：多个证据贡献者并行观察 prompt，各自发出带 confidence 的证据，统一聚合到 8 个轴的读数。这里的 Static Mode 主要服务于传统 prompt pressure 诊断；Skill HUD 是另一条执行前控制路径，会动态抽取本轮用户要求并和 agent planned focus 做对齐判断。
 
 | 层 | 作用 | 代价 |
 | --- | --- | --- |
@@ -269,7 +269,7 @@ DeepSeek-first, not DeepSeek-only — 详见 [docs/DEEPSEEK_ROADMAP.md](https://
 
 ## 贡献
 
-规则库的质量 = 项目的核心价值。如果你发现：
+证据和校准质量 = 项目的核心价值。如果你发现：
 - 一个常见 prompt 模式没被检测到
 - 现有规则有误判
 - 想加新的目标预设

@@ -48,7 +48,7 @@ Because self-reflection keeps the judge inside the same unstable system.
 - A second LLM judge adds latency, cost, and another nondeterministic dependency.
 - Enterprise teams need a consistent control signal across agents, prompts, model versions, and deployments.
 
-StateProbe's default layer is an external, deterministic preflight. For open-weight models, the long-term Runtime Probe line moves below text into hidden states, persona/emotion vectors, and MoE routing signals.
+StateProbe's default Skill layer is an external, deterministic preflight that dynamically extracts requirements from the current turn, builds a user-intent map, compares it with the agent's planned focus, and emits a structured control decision. It is not a fixed prompt-rule scan. For open-weight models, the long-term Runtime Probe line moves below text into hidden states, persona/emotion vectors, and MoE routing signals.
 
 ## Install
 
@@ -118,7 +118,7 @@ StateProbe is deliberately staged:
 | Stage | Status | What it proves |
 | --- | --- | --- |
 | **Open-source MCP / CLI** | Shipped | Agent drift can be caught before output/tool execution without another LLM call. |
-| **Skill HUD** | Shipped | Hosts can branch on structured `activation_decision` instead of reading paragraphs of critique. |
+| **Skill HUD** | Shipped | Per-turn user requirements are extracted dynamically; hosts branch on structured `activation_decision` instead of reading paragraphs of critique. |
 | **Lab activation projection** | Experimental | Open-weight model activations can be projected onto behavior/persona axes. |
 | **Team dashboard** | Planned | Teams need a record of drift cases, prompt versions, risk trends, and calibration decisions. |
 | **Enterprise Runtime Probe** | Planned / placeholder | Open-weight model operators need hidden-state, router-trace, and output-state reports in production. |
@@ -131,7 +131,7 @@ The commercial shape is not "another prompt tool." The wedge is open-source deve
 
 **StateProbe is not**:
 
-- **Not an oracle.** Rule-based judges have false positives and false negatives. That is why every verdict ships with `confidence` and `evidence`, and only `high` confidence ever stops an agent.
+- **Not an oracle.** Deterministic text judges have false positives and false negatives. That is why every verdict ships with `confidence` and `evidence`, and only `high` confidence ever stops an agent.
 - **Not a replacement for human or LLM review.** Review agents look at finished output. StateProbe looks at planned focus. They are complementary, not substitutes.
 - **Not a semantic correctness checker.** It does not know whether your code is right, whether your essay is true, or whether your design is good. It checks attention alignment, not domain truth.
 - **Not a "spin up another agent to judge this one" wrapper.** The whole point is that the default path is local, deterministic, zero-API-cost, and emits a structured `activation_decision` your host can branch on — not a paragraph of LLM critique.
@@ -174,7 +174,7 @@ Complementary, not competitive. promptfoo / Guardrails check what came out; Lang
 
 ## Architecture
 
-Hybrid evidence pipeline ([ADR_009](https://github.com/Erye932/stateprobe/blob/main/docs/adr/009-hybrid-engine.md)): independent contributors emit confidence-weighted evidence, aggregated into 8 behavior axes. Static rules are always on (zero cost); the LLM and Lab layers are opt-in and stack on top.
+Hybrid evidence pipeline ([ADR_009](https://github.com/Erye932/stateprobe/blob/main/docs/adr/009-hybrid-engine.md)): independent contributors emit confidence-weighted evidence, aggregated into 8 behavior axes. For legacy prompt-pressure diagnosis, Static Mode remains always on and zero cost; the LLM and Lab layers are opt-in and stack on top. The Skill HUD path is separate: it dynamically extracts per-turn requirements and compares them with planned/actual agent focus.
 
 | Layer | Purpose | Cost |
 | --- | --- | --- |
@@ -222,7 +222,7 @@ See [CHANGELOG](https://github.com/Erye932/stateprobe/blob/main/CHANGELOG.md) fo
 
 ## Contributing
 
-Rule library quality = the project's core value. If you find a prompt pattern that isn't detected, a misfire, or want a new target preset — open an issue or PR.
+Evidence and calibration quality = the project's core value. If you find a prompt pattern that isn't detected, a misfire, or want a new target preset — open an issue or PR.
 
 Each rule contribution must include: pattern / affected axis / direction / weight / **mechanism** / **paper citation**. See [CONTRIBUTING.md](https://github.com/Erye932/stateprobe/blob/main/CONTRIBUTING.md).
 

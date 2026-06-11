@@ -5,9 +5,11 @@ the Skill agree with a human?"** with a number instead of a slogan.
 
 ## Why this exists
 
-StateProbe Skill is rule-based. Rule-based judges always have false
-positives and false negatives. The defensible answer to "is it accurate
-enough to use?" is not "trust us"; it is:
+StateProbe Skill is a deterministic text layer: it dynamically extracts
+requirements from the current user context, compares them with the
+planned focus / output, and emits a control decision. Deterministic text
+judges always have false positives and false negatives. The defensible
+answer to "is it accurate enough to use?" is not "trust us"; it is:
 
 1. Maintain a small, hand-labelled fixture of representative cases.
 2. Run the live decision against every case.
@@ -119,9 +121,9 @@ is what blocks regressions.
 
 ## What this is not
 
-- **Not a replacement for an LLM judge.** StateProbe deliberately stays
-  rule-based and zero-cost. Calibration is what makes the rule layer
-  defensible.
+- **Not a replacement for an LLM judge.** StateProbe deliberately keeps
+  the Skill path deterministic, local, and zero-cost. Calibration is
+  what makes this dynamic text layer defensible.
 - **Not a benchmark suite.** It is a small fixture meant to grow
   organically as users report cases. The current 51 cases are a
   starting point, not a proof of accuracy.

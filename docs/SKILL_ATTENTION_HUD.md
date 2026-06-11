@@ -71,7 +71,7 @@ StateProbe Skill 不是 oracle。每条 `activation_decision` 都带：
 - 所有 hard stop 都必须有 `evidence`，host 可以直接展示给用户解释「为什么停」。
 - `continue` / `continue_with_warning` 都不会阻塞 agent，只有 `should_stop=false` 才允许 agent 继续输出。
 
-这条契约的目的：**规则永远会有误判**。StateProbe 选择的策略是宁可让 host 看到 warning，也不主动打断真实工作流；硬拦只用在证据很强的情况上。
+这条契约的目的：**确定性文本判断永远会有误判**。StateProbe 选择的策略是宁可让 host 看到 warning，也不主动打断真实工作流；硬拦只用在证据很强的情况上。
 
 对画图 / 视频生成任务，下面这些边界字段最重要：
 

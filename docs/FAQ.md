@@ -6,13 +6,18 @@ This FAQ answers the questions developers and AI technical readers are likely to
 
 V0.1 Static Mode is deliberately rule-based: it is fast, offline, deterministic, and easy to inspect.
 
-But StateProbe is not positioned as only regex. The project has three evidence layers:
+But StateProbe is not positioned as only regex. There are two different surfaces:
+
+- `stateprobe check` / Static Mode: regex-backed prompt-pressure diagnosis.
+- `stateprobe skill preview` / Skill HUD: dynamic per-turn requirement extraction, user-intent mapping, planned-focus alignment, and structured `activation_decision`.
+
+The broader project has three evidence layers:
 
 - Static rules for prompt pressure
 - Black-box eval for actual output behavior
 - DeepSeek Lab for local hidden-state activation probing
 
-The important point is transparency: Static Mode is a proxy, not a hidden-state reader.
+The important point is transparency: Static Mode is a proxy, Skill HUD is a deterministic dynamic text layer, and neither should be marketed as hidden-state reading.
 
 ## Does StateProbe read real activations?
 
