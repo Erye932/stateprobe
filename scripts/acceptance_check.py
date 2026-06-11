@@ -101,8 +101,8 @@ def check_readme(result: Result) -> None:
     """Validate the bilingual README pair.
 
     The repo ships two top-level READMEs since the launch repackaging:
-    - `README.md` — English primary, high-star convention, A2 hero
-      ("The attention layer for LLM agents.")
+    - `README.md` — English primary, high-star convention, runtime firewall
+      positioning for agent execution risk
     - `README.zh-CN.md` — Chinese mirror with the full China-specific install
       flow, PowerShell encoding fix, and richer narrative
 
@@ -117,8 +117,8 @@ def check_readme(result: Result) -> None:
 
     # English primary: hero + high-star structural invariants
     en_required = [
-        # A2 hero locked at launch repackaging
-        "The attention layer for LLM agents.",
+        # Runtime-control hero
+        "A runtime state firewall for AI agents.",
         # Boundary statement (English + Chinese mixed callout in EN README)
         "OpenAI/Claude 物理上读不到",
         # Sibling link to mirror
@@ -158,8 +158,8 @@ def check_readme(result: Result) -> None:
 
     en_first_screen = "\n".join(en_text.splitlines()[:40])
     result.check(
-        "agents drift" in en_first_screen
-        or "actually answer" in en_first_screen,
+        "before execution" in en_first_screen
+        or "before the tool call" in en_first_screen,
         "README.md first screen states the core pain",
     )
     # Boundary in English README
@@ -175,7 +175,7 @@ def check_readme(result: Result) -> None:
 
     # Chinese mirror: comprehensive Chinese narrative + China install flow
     zh_required = [
-        "LLM agent 的注意力控制层",
+        "AI Agent 的运行时状态防火墙",
         "docs/images/skill_preview_demo.svg",
         "30 秒 demo",
         "PowerShell",
